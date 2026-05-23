@@ -1,11 +1,13 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jaysyrk/ousia/internal/balancer"
 	"github.com/jaysyrk/ousia/internal/router"
 	"github.com/jaysyrk/ousia/pkg/config"
+	"github.com/jaysyrk/ousia/pkg/healthcheck"
 	"github.com/jaysyrk/ousia/pkg/types"
 )
 
@@ -15,10 +17,13 @@ func Bootstrap(cfg *config.OusiaConfig) (*Server, error) {
 		return nil, err
 	}
 
-	balancers, err := buildBalancers(cfg)
+	balancers, allEndpoints, err := buildBalancers(cfg)
 	if err != nil {
 		return nil, err
 	}
+
+	hc := healthcheck.New(allEndpoints, healthcheck.DefaultConfig())
+	hc.Start(context.Background())
 
 	r := router.New(virtualHosts)
 	h := NewHandler(r, balancers)
@@ -68,8 +73,9 @@ func buildVirtualHosts(cfg *config.OusiaConfig) ([]*types.VirtualHost, error) {
 	return hosts, nil
 }
 
-func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, error) {
+func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, []*types.Endpoint, error) {
 	balancers := make(map[string]balancer.Balancer)
+	var allEndpoints []*types.Endpoint
 
 	for _, upCfg := range cfg.Upstreams {
 		var endpoints []*types.Endpoint
@@ -79,13 +85,15 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, erro
 			if w == 0 {
 				w = 1
 			}
-			endpoints = append(endpoints, &types.Endpoint{
+			ep := &types.Endpoint{
 				ID:       epCfg.ID,
 				Address:  epCfg.Address,
 				Weight:   w,
 				Healthy:  true,
 				Metadata: epCfg.Meta,
-			})
+			}
+			endpoints = append(endpoints, ep)
+			allEndpoints = append(allEndpoints, ep)
 		}
 
 		pool := &types.UpstreamPool{
@@ -96,11 +104,11 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, erro
 
 		lb, err := balancer.New(pool)
 		if err != nil {
-			return nil, fmt.Errorf("bootstrap: %w", err)
+			return nil, nil, fmt.Errorf("bootstrap: %w", err)
 		}
 
 		balancers[upCfg.Name] = lb
 	}
 
-	return balancers, nil
+	return balancers, allEndpoints, nil
 }
