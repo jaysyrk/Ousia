@@ -59,8 +59,8 @@ func main() {
 	)
 	go registrar.Start(ctx)
 
-	inbound := gateway.NewInboundProxy(cfg.LocalPort)
-	outbound := gateway.NewOutboundProxy(mapper)
+	inbound := gateway.NewInboundProxy(cfg.LocalPort, cfg.ServiceID)
+	outbound := gateway.NewOutboundProxy(mapper, cfg.ServiceID)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -80,6 +80,6 @@ func main() {
 	fmt.Printf("Ousia sidecar started for service %q (instance: %s)\n", cfg.ServiceID, instanceID)
 	<-quit
 	fmt.Println("sidecar shutting down, deregistering from mesh...")
-	cancel() // triggers deregister in registrar
+	cancel()                           // triggers deregister in registrar
 	time.Sleep(500 * time.Millisecond) // brief grace period for deregister call
 }

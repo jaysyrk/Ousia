@@ -20,9 +20,15 @@ func (r *statusRecorder) WriteHeader(code int) {
 
 func Middleware(upstream string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		traceID := uuid.New().String()
+		// 1. Extract existing trace ID or generate a new one if not present
+		traceID := req.Header.Get("X-Trace-Id")
+		if traceID == "" {
+			traceID = uuid.New().String()
+		}
+
 		start := time.Now()
 
+		// 2. Propagate trace ID to downstream request and upstream response headers
 		w.Header().Set("X-Trace-Id", traceID)
 		req.Header.Set("X-Trace-Id", traceID)
 

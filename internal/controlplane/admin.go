@@ -3,12 +3,14 @@ package controlplane
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/jaysyrk/ousia/internal/balancer"
+	"github.com/jaysyrk/ousia/internal/observability"
 	"github.com/jaysyrk/ousia/internal/router"
 	"github.com/jaysyrk/ousia/pkg/config"
 	"github.com/jaysyrk/ousia/pkg/types"
@@ -36,6 +38,7 @@ func (a *AdminAPI) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/upstreams", a.handleUpstreams)
 	mux.HandleFunc("/api/upstreams/", a.handleUpstreamEndpoints)
 	mux.HandleFunc("/api/health", a.handleHealth)
+	mux.HandleFunc("/api/stats", a.handleStats)
 
 	// Service mesh endpoints
 	mux.HandleFunc("/api/mesh/register", a.handleMeshRegister)
@@ -787,4 +790,37 @@ func (a *AdminAPI) handleMeshServices(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"services": services, "count": len(services)})
+}
+
+func (a *AdminAPI) handleStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	gatewayStats := observability.GetStatsJSON()
+	sidecarStats := make(map[string]map[string]string)
+	
+	client := &http.Client{Timeout: 2 * time.Second}
+	
+	for _, inst := range a.mesh.Instances() {
+		if _, ok := sidecarStats[inst.ServiceID]; !ok {
+			sidecarStats[inst.ServiceID] = make(map[string]string)
+		}
+		
+		url := fmt.Sprintf("http://%s:%d/stats", inst.Address, inst.Port)
+		resp, err := client.Get(url)
+		if err == nil {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			sidecarStats[inst.ServiceID][inst.InstanceID] = string(body)
+		} else {
+			sidecarStats[inst.ServiceID][inst.InstanceID] = "error: " + err.Error()
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"gateway":  gatewayStats,
+		"sidecars": sidecarStats,
+	})
 }
