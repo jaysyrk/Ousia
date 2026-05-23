@@ -1,9 +1,13 @@
 ﻿package main
 
 import (
-	"fmt"
+	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/jaysyrk/ousia/internal/gateway"
 	"github.com/jaysyrk/ousia/pkg/config"
 )
 
@@ -13,7 +17,27 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	fmt.Printf("Ousia Gateway starting on %s\n", cfg.Gateway.ListenAddr)
-	fmt.Printf("Loaded %d virtual host(s)\n", len(cfg.VirtualHosts))
-	fmt.Printf("Loaded %d upstream pool(s)\n", len(cfg.Upstreams))
+	srv, err := gateway.Bootstrap(cfg)
+	if err != nil {
+		log.Fatalf("failed to bootstrap gateway: %v", err)
+	}
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		if err := srv.Start(); err != nil {
+			log.Printf("gateway stopped: %v", err)
+		}
+	}()
+
+	<-quit
+	log.Println("shutting down gracefully...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("forced shutdown: %v", err)
+	}
 }
