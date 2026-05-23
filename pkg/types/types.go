@@ -27,6 +27,7 @@ const (
 
 type RouteMatch struct {
 	PathPrefix string
+	PathExact string
 	Methods    []string
 	Headers    map[string]string
 }
