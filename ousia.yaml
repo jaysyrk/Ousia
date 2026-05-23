@@ -1,0 +1,36 @@
+gateway:
+  listen_addr: ":8080"
+  tls_addr: ":8443"
+  admin_addr: ":9000"
+
+virtual_hosts:
+  - hostname: "api.example.com"
+    routes:
+      - id: "route-api-v1"
+        priority: 1
+        match:
+          path_prefix: "/api/v1"
+          methods: ["GET", "POST"]
+        action:
+          upstream: "backend-pool"
+          timeout: "30s"
+          retry_count: 2
+
+      - id: "route-health"
+        priority: 0
+        match:
+          path_exact: "/healthz"
+        action:
+          upstream: "backend-pool"
+          timeout: "5s"
+
+upstreams:
+  - name: "backend-pool"
+    algorithm: "round-robin"
+    endpoints:
+      - id: "backend-1"
+        address: "127.0.0.1:9001"
+        weight: 1
+      - id: "backend-2"
+        address: "127.0.0.1:9002"
+        weight: 1
