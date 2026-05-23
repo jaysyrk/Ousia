@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/jaysyrk/ousia/pkg/middleware"
 )
 
 type Server struct {
@@ -12,10 +14,18 @@ type Server struct {
 }
 
 func NewServer(addr string, handler http.Handler) *Server {
+	chain := middleware.Chain(
+		handler,
+		middleware.RequestID,
+		middleware.RateLimit(100, 200),
+		middleware.CORS(middleware.DefaultCORSConfig()),
+		middleware.Timeout(30*time.Second),
+	)
+
 	return &Server{
 		httpServer: &http.Server{
 			Addr:         addr,
-			Handler:      handler,
+			Handler:      chain,
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 60 * time.Second,
 			IdleTimeout:  120 * time.Second,
