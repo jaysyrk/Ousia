@@ -1,3 +1,3 @@
-module github.com/ousia-io/ousia/control-plane
+module github.com/jaysyrk/ousia/control-plane
 
 go 1.26.3
