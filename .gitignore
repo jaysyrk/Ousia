@@ -1,0 +1,30 @@
+﻿# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Go build cache
+*.test
+*.out
+coverage.out
+
+# Go workspace (local only)
+go.work.sum
+
+# Environment / secrets
+.env
+*.pem
+*.key
+*.crt
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+desktop.ini
