@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,9 +12,11 @@ import (
 
 type Server struct {
 	httpServer *http.Server
+	tlsServer  *http.Server
+	tlsAddr    string
 }
 
-func NewServer(addr string, handler http.Handler) *Server {
+func NewServer(addr string, tlsAddr string, handler http.Handler, tlsCfg *tls.Config) *Server {
 	chain := middleware.Chain(
 		handler,
 		middleware.RequestID,
@@ -22,22 +25,45 @@ func NewServer(addr string, handler http.Handler) *Server {
 		middleware.Timeout(30*time.Second),
 	)
 
-	return &Server{
+	httpHandler := chain
+	if tlsAddr != "" {
+		httpHandler = redirectToHTTPS(tlsAddr)
+	}
+
+	s := &Server{
+		tlsAddr: tlsAddr,
 		httpServer: &http.Server{
 			Addr:         addr,
-			Handler:      chain,
+			Handler:      httpHandler,
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 60 * time.Second,
 			IdleTimeout:  120 * time.Second,
 		},
 	}
+
+	if tlsCfg != nil && tlsAddr != "" {
+		s.tlsServer = newTLSServer(tlsAddr, chain, tlsCfg)
+	}
+
+	return s
 }
 
 func (s *Server) Start() error {
 	fmt.Printf("Ousia Gateway listening on %s\n", s.httpServer.Addr)
+	if s.tlsServer != nil {
+		go func() {
+			fmt.Printf("Ousia Gateway TLS listening on %s\n", s.tlsAddr)
+			if err := s.tlsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				fmt.Printf("TLS server error: %v\n", err)
+			}
+		}()
+	}
 	return s.httpServer.ListenAndServe()
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.tlsServer != nil {
+		s.tlsServer.Shutdown(ctx)
+	}
 	return s.httpServer.Shutdown(ctx)
 }

@@ -5,6 +5,9 @@ gateway:
 
 virtual_hosts:
   - hostname: "api.example.com"
+    tls:
+      cert_file: "certs/server.crt"
+      key_file: "certs/server.key"
     routes:
       - id: "route-api-v1"
         priority: 1
@@ -17,7 +20,7 @@ virtual_hosts:
           retry_count: 2
 
       - id: "route-health"
-        priority: 1
+        priority: 0
         match:
           path_exact: "/healthz"
         action:

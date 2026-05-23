@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -34,7 +35,24 @@ func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 
 	r := router.New(virtualHosts)
 	h := NewHandler(r, balancers)
-	s := NewServer(cfg.Gateway.ListenAddr, h)
+
+	var tlsCfg *tls.Config
+	if cfg.Gateway.TLSAddr != "" {
+		for _, vh := range cfg.VirtualHosts {
+			if vh.TLS != nil {
+				tlsCfg, err = buildTLSConfig(&types.TLSConfig{
+					CertFile: vh.TLS.CertFile,
+					KeyFile:  vh.TLS.KeyFile,
+				})
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
+		}
+	}
+
+	s := NewServer(cfg.Gateway.ListenAddr, cfg.Gateway.TLSAddr, h, tlsCfg)
 
 	store := controlplane.NewStore(cfg)
 	watcher := controlplane.NewWatcher(configPath, store, 5*time.Second)
