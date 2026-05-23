@@ -1,7 +1,7 @@
-﻿package main
+package main
 
 import "fmt"
 
 func main() {
-    fmt.Println("Ousia Control Plane - starting")
+	fmt.Println("Ousia Control Plane - starting")
 }

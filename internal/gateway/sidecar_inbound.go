@@ -15,7 +15,7 @@ import (
 
 type statusRecorder struct {
 	http.ResponseWriter
-	status int
+	status	int
 }
 
 func (r *statusRecorder) WriteHeader(code int) {
@@ -24,8 +24,8 @@ func (r *statusRecorder) WriteHeader(code int) {
 }
 
 type InboundProxy struct {
-	localPort int
-	serviceID string
+	localPort	int
+	serviceID	string
 }
 
 func NewInboundProxy(localPort int, serviceID string) *InboundProxy {
@@ -34,8 +34,8 @@ func NewInboundProxy(localPort int, serviceID string) *InboundProxy {
 
 func (p *InboundProxy) Start(listenAddr string) error {
 	target := &url.URL{
-		Scheme: "http",
-		Host:   fmt.Sprintf("127.0.0.1:%d", p.localPort),
+		Scheme:	"http",
+		Host:	fmt.Sprintf("127.0.0.1:%d", p.localPort),
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
@@ -77,8 +77,8 @@ func (p *InboundProxy) Start(listenAddr string) error {
 }
 
 type OutboundProxy struct {
-	mapper    *ServiceMapper
-	serviceID string
+	mapper		*ServiceMapper
+	serviceID	string
 }
 
 func NewOutboundProxy(mapper *ServiceMapper, serviceID string) *OutboundProxy {

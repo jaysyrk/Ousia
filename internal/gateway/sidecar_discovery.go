@@ -10,15 +10,15 @@ import (
 )
 
 type ServiceMapper struct {
-	mu        sync.RWMutex
-	endpoints map[string][]string
-	counters  map[string]int
+	mu		sync.RWMutex
+	endpoints	map[string][]string
+	counters	map[string]int
 }
 
 func NewServiceMapper() *ServiceMapper {
 	return &ServiceMapper{
-		endpoints: make(map[string][]string),
-		counters:  make(map[string]int),
+		endpoints:	make(map[string][]string),
+		counters:	make(map[string]int),
 	}
 }
 
@@ -42,20 +42,20 @@ func (m *ServiceMapper) Next(service string) (string, bool) {
 }
 
 type SidecarDiscovery struct {
-	adminURL string
-	mapper   *ServiceMapper
-	client   *http.Client
-	interval time.Duration
+	adminURL	string
+	mapper		*ServiceMapper
+	client		*http.Client
+	interval	time.Duration
 }
 
 func NewSidecarDiscovery(adminURL string, mapper *ServiceMapper, interval time.Duration) *SidecarDiscovery {
 	return &SidecarDiscovery{
-		adminURL: adminURL,
-		mapper:   mapper,
+		adminURL:	adminURL,
+		mapper:		mapper,
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
-		interval: interval,
+		interval:	interval,
 	}
 }
 
@@ -118,13 +118,13 @@ func (d *SidecarDiscovery) fetchUpstreams(ctx context.Context) ([]upstreamRespon
 }
 
 type upstreamResponse struct {
-	Name      string             `json:"name"`
-	Endpoints []endpointResponse `json:"endpoints"`
+	Name		string			`json:"name"`
+	Endpoints	[]endpointResponse	`json:"endpoints"`
 }
 
 type endpointResponse struct {
-	ID      string `json:"id"`
-	Address string `json:"address"`
-	Weight  int    `json:"weight"`
-	Healthy bool   `json:"healthy"`
+	ID	string	`json:"id"`
+	Address	string	`json:"address"`
+	Weight	int	`json:"weight"`
+	Healthy	bool	`json:"healthy"`
 }

@@ -13,14 +13,14 @@ import (
 )
 
 type Handler struct {
-	router    *router.Router
-	balancers map[string]balancer.Balancer
+	router		*router.Router
+	balancers	map[string]balancer.Balancer
 }
 
 func NewHandler(r *router.Router, balancers map[string]balancer.Balancer) *Handler {
 	return &Handler{
-		router:    r,
-		balancers: balancers,
+		router:		r,
+		balancers:	balancers,
 	}
 }
 
@@ -56,8 +56,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route *types.Route) {
 	target := &url.URL{
-		Scheme: "http",
-		Host:   ep.Address,
+		Scheme:	"http",
+		Host:	ep.Address,
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)

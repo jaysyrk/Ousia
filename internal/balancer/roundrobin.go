@@ -8,9 +8,9 @@ import (
 )
 
 type RoundRobin struct {
-	mu        sync.RWMutex
-	endpoints []*types.Endpoint
-	counter   atomic.Uint64
+	mu		sync.RWMutex
+	endpoints	[]*types.Endpoint
+	counter		atomic.Uint64
 }
 
 func NewRoundRobin(endpoints []*types.Endpoint) *RoundRobin {

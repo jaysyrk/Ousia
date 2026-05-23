@@ -12,28 +12,28 @@ var ErrCircuitOpen = errors.New("circuit breaker is open")
 type State int
 
 const (
-	StateClosed State = iota
+	StateClosed	State	= iota
 	StateOpen
 	StateHalfOpen
 )
 
 type CircuitBreaker struct {
-	mu          sync.Mutex
-	state       State
-	failures    int
-	successes   int
-	threshold   int
-	timeout     time.Duration
-	openedAt    time.Time
-	halfOpenMax int
+	mu		sync.Mutex
+	state		State
+	failures	int
+	successes	int
+	threshold	int
+	timeout		time.Duration
+	openedAt	time.Time
+	halfOpenMax	int
 }
 
 func NewCircuitBreaker(threshold int, timeout time.Duration) *CircuitBreaker {
 	return &CircuitBreaker{
-		threshold:   threshold,
-		timeout:     timeout,
-		halfOpenMax: 1,
-		state:       StateClosed,
+		threshold:	threshold,
+		timeout:	timeout,
+		halfOpenMax:	1,
+		state:		StateClosed,
 	}
 }
 

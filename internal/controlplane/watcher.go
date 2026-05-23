@@ -14,18 +14,18 @@ import (
 type UpdateFunc func(cfg *config.OusiaConfig)
 
 type Watcher struct {
-	path     string
-	store    *Store
-	interval time.Duration
-	lastHash [16]byte
-	onChange []UpdateFunc
+	path		string
+	store		*Store
+	interval	time.Duration
+	lastHash	[16]byte
+	onChange	[]UpdateFunc
 }
 
 func NewWatcher(path string, store *Store, interval time.Duration) *Watcher {
 	return &Watcher{
-		path:     path,
-		store:    store,
-		interval: interval,
+		path:		path,
+		store:		store,
+		interval:	interval,
 	}
 }
 

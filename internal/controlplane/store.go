@@ -7,8 +7,8 @@ import (
 )
 
 type Store struct {
-	mu  sync.RWMutex
-	cfg *config.OusiaConfig
+	mu	sync.RWMutex
+	cfg	*config.OusiaConfig
 }
 
 func NewStore(initial *config.OusiaConfig) *Store {

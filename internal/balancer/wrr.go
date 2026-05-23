@@ -8,8 +8,8 @@ import (
 )
 
 type WRR struct {
-	mu      sync.RWMutex
-	entries []*types.Endpoint
+	mu	sync.RWMutex
+	entries	[]*types.Endpoint
 }
 
 func NewWRR(endpoints []*types.Endpoint) *WRR {

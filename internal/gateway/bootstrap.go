@@ -40,8 +40,8 @@ func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 		for _, vh := range cfg.VirtualHosts {
 			if vh.TLS != nil {
 				tlsCfg, err = buildTLSConfig(&types.TLSConfig{
-					CertFile: vh.TLS.CertFile,
-					KeyFile:  vh.TLS.KeyFile,
+					CertFile:	vh.TLS.CertFile,
+					KeyFile:	vh.TLS.KeyFile,
 				})
 				if err != nil {
 					return nil, err
@@ -76,26 +76,26 @@ func buildVirtualHosts(cfg *config.OusiaConfig) ([]*types.VirtualHost, error) {
 
 		if vhCfg.TLS != nil {
 			vh.TLS = &types.TLSConfig{
-				CertFile: vhCfg.TLS.CertFile,
-				KeyFile:  vhCfg.TLS.KeyFile,
+				CertFile:	vhCfg.TLS.CertFile,
+				KeyFile:	vhCfg.TLS.KeyFile,
 			}
 		}
 
 		for _, rCfg := range vhCfg.Routes {
 			route := &types.Route{
-				ID:       rCfg.ID,
-				Priority: rCfg.Priority,
+				ID:		rCfg.ID,
+				Priority:	rCfg.Priority,
 				Match: types.RouteMatch{
-					PathPrefix: rCfg.Match.PathPrefix,
-					PathExact:  rCfg.Match.PathExact,
-					Methods:    rCfg.Match.Methods,
-					Headers:    rCfg.Match.Headers,
+					PathPrefix:	rCfg.Match.PathPrefix,
+					PathExact:	rCfg.Match.PathExact,
+					Methods:	rCfg.Match.Methods,
+					Headers:	rCfg.Match.Headers,
 				},
 				Action: types.RouteAction{
-					UpstreamPool: rCfg.Action.Upstream,
-					StripPrefix:  rCfg.Action.StripPrefix,
-					AddHeaders:   rCfg.Action.AddHeaders,
-					RetryCount:   rCfg.Action.RetryCount,
+					UpstreamPool:	rCfg.Action.Upstream,
+					StripPrefix:	rCfg.Action.StripPrefix,
+					AddHeaders:	rCfg.Action.AddHeaders,
+					RetryCount:	rCfg.Action.RetryCount,
 				},
 			}
 			vh.Routes = append(vh.Routes, route)
@@ -120,20 +120,20 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, []*t
 				w = 1
 			}
 			ep := &types.Endpoint{
-				ID:       epCfg.ID,
-				Address:  epCfg.Address,
-				Weight:   w,
-				Healthy:  true,
-				Metadata: epCfg.Meta,
+				ID:		epCfg.ID,
+				Address:	epCfg.Address,
+				Weight:		w,
+				Healthy:	true,
+				Metadata:	epCfg.Meta,
 			}
 			endpoints = append(endpoints, ep)
 			allEndpoints = append(allEndpoints, ep)
 		}
 
 		pool := &types.UpstreamPool{
-			Name:      upCfg.Name,
-			Endpoints: endpoints,
-			Algorithm: types.LBAlgorithm(upCfg.Algorithm),
+			Name:		upCfg.Name,
+			Endpoints:	endpoints,
+			Algorithm:	types.LBAlgorithm(upCfg.Algorithm),
 		}
 
 		lb, err := balancer.New(pool)

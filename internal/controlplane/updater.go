@@ -24,26 +24,26 @@ func applyVirtualHosts(r *router.Router, cfg *config.OusiaConfig) {
 
 		if vhCfg.TLS != nil {
 			vh.TLS = &types.TLSConfig{
-				CertFile: vhCfg.TLS.CertFile,
-				KeyFile:  vhCfg.TLS.KeyFile,
+				CertFile:	vhCfg.TLS.CertFile,
+				KeyFile:	vhCfg.TLS.KeyFile,
 			}
 		}
 
 		for _, rCfg := range vhCfg.Routes {
 			route := &types.Route{
-				ID:       rCfg.ID,
-				Priority: rCfg.Priority,
+				ID:		rCfg.ID,
+				Priority:	rCfg.Priority,
 				Match: types.RouteMatch{
-					PathPrefix: rCfg.Match.PathPrefix,
-					PathExact:  rCfg.Match.PathExact,
-					Methods:    rCfg.Match.Methods,
-					Headers:    rCfg.Match.Headers,
+					PathPrefix:	rCfg.Match.PathPrefix,
+					PathExact:	rCfg.Match.PathExact,
+					Methods:	rCfg.Match.Methods,
+					Headers:	rCfg.Match.Headers,
 				},
 				Action: types.RouteAction{
-					UpstreamPool: rCfg.Action.Upstream,
-					StripPrefix:  rCfg.Action.StripPrefix,
-					AddHeaders:   rCfg.Action.AddHeaders,
-					RetryCount:   rCfg.Action.RetryCount,
+					UpstreamPool:	rCfg.Action.Upstream,
+					StripPrefix:	rCfg.Action.StripPrefix,
+					AddHeaders:	rCfg.Action.AddHeaders,
+					RetryCount:	rCfg.Action.RetryCount,
 				},
 			}
 			vh.Routes = append(vh.Routes, route)
@@ -64,18 +64,18 @@ func applyUpstreams(balancers map[string]balancer.Balancer, cfg *config.OusiaCon
 				w = 1
 			}
 			endpoints = append(endpoints, &types.Endpoint{
-				ID:       epCfg.ID,
-				Address:  epCfg.Address,
-				Weight:   w,
-				Healthy:  true,
-				Metadata: epCfg.Meta,
+				ID:		epCfg.ID,
+				Address:	epCfg.Address,
+				Weight:		w,
+				Healthy:	true,
+				Metadata:	epCfg.Meta,
 			})
 		}
 
 		pool := &types.UpstreamPool{
-			Name:      upCfg.Name,
-			Endpoints: endpoints,
-			Algorithm: types.LBAlgorithm(upCfg.Algorithm),
+			Name:		upCfg.Name,
+			Endpoints:	endpoints,
+			Algorithm:	types.LBAlgorithm(upCfg.Algorithm),
 		}
 
 		lb, err := balancer.New(pool)

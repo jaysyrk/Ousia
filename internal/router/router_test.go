@@ -10,13 +10,13 @@ import (
 
 func TestRouter_ExactPath(t *testing.T) {
 	vh := &types.VirtualHost{
-		Hostname: "api.example.com",
+		Hostname:	"api.example.com",
 		Routes: []*types.Route{
 			{
-				ID:       "health",
-				Priority: 0,
-				Match:    types.RouteMatch{PathExact: "/healthz"},
-				Action:   types.RouteAction{UpstreamPool: "backend"},
+				ID:		"health",
+				Priority:	0,
+				Match:		types.RouteMatch{PathExact: "/healthz"},
+				Action:		types.RouteAction{UpstreamPool: "backend"},
 			},
 		},
 	}
@@ -37,13 +37,13 @@ func TestRouter_ExactPath(t *testing.T) {
 
 func TestRouter_PrefixPath(t *testing.T) {
 	vh := &types.VirtualHost{
-		Hostname: "api.example.com",
+		Hostname:	"api.example.com",
 		Routes: []*types.Route{
 			{
-				ID:       "api-v1",
-				Priority: 1,
-				Match:    types.RouteMatch{PathPrefix: "/api/v1"},
-				Action:   types.RouteAction{UpstreamPool: "backend"},
+				ID:		"api-v1",
+				Priority:	1,
+				Match:		types.RouteMatch{PathPrefix: "/api/v1"},
+				Action:		types.RouteAction{UpstreamPool: "backend"},
 			},
 		},
 	}
@@ -64,13 +64,13 @@ func TestRouter_PrefixPath(t *testing.T) {
 
 func TestRouter_MethodFilter(t *testing.T) {
 	vh := &types.VirtualHost{
-		Hostname: "*",
+		Hostname:	"*",
 		Routes: []*types.Route{
 			{
-				ID:       "post-only",
-				Priority: 0,
-				Match:    types.RouteMatch{PathPrefix: "/submit", Methods: []string{"POST"}},
-				Action:   types.RouteAction{UpstreamPool: "backend"},
+				ID:		"post-only",
+				Priority:	0,
+				Match:		types.RouteMatch{PathPrefix: "/submit", Methods: []string{"POST"}},
+				Action:		types.RouteAction{UpstreamPool: "backend"},
 			},
 		},
 	}
@@ -97,11 +97,11 @@ func TestRouter_MethodFilter(t *testing.T) {
 
 func TestRouter_NoMatch(t *testing.T) {
 	vh := &types.VirtualHost{
-		Hostname: "api.example.com",
+		Hostname:	"api.example.com",
 		Routes: []*types.Route{
 			{
-				ID:    "only-route",
-				Match: types.RouteMatch{PathExact: "/only"},
+				ID:	"only-route",
+				Match:	types.RouteMatch{PathExact: "/only"},
 			},
 		},
 	}

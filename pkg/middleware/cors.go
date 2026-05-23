@@ -3,18 +3,18 @@ package middleware
 import "net/http"
 
 type CORSConfig struct {
-	AllowedOrigins []string
-	AllowedMethods []string
-	AllowedHeaders []string
-	MaxAge         string
+	AllowedOrigins	[]string
+	AllowedMethods	[]string
+	AllowedHeaders	[]string
+	MaxAge		string
 }
 
 func DefaultCORSConfig() CORSConfig {
 	return CORSConfig{
-		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders: []string{"Content-Type", "Authorization", "X-Request-Id", "X-Trace-Id"},
-		MaxAge:         "86400",
+		AllowedOrigins:	[]string{"*"},
+		AllowedMethods:	[]string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowedHeaders:	[]string{"Content-Type", "Authorization", "X-Request-Id", "X-Trace-Id"},
+		MaxAge:		"86400",
 	}
 }
 

@@ -11,9 +11,9 @@ import (
 )
 
 type Server struct {
-	httpServer *http.Server
-	tlsServer  *http.Server
-	tlsAddr    string
+	httpServer	*http.Server
+	tlsServer	*http.Server
+	tlsAddr		string
 }
 
 func NewServer(addr string, tlsAddr string, handler http.Handler, tlsCfg *tls.Config) *Server {
@@ -31,13 +31,13 @@ func NewServer(addr string, tlsAddr string, handler http.Handler, tlsCfg *tls.Co
 	}
 
 	s := &Server{
-		tlsAddr: tlsAddr,
+		tlsAddr:	tlsAddr,
 		httpServer: &http.Server{
-			Addr:         addr,
-			Handler:      httpHandler,
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 60 * time.Second,
-			IdleTimeout:  120 * time.Second,
+			Addr:		addr,
+			Handler:	httpHandler,
+			ReadTimeout:	15 * time.Second,
+			WriteTimeout:	60 * time.Second,
+			IdleTimeout:	120 * time.Second,
 		},
 	}
 

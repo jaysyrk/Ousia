@@ -16,8 +16,8 @@ func buildTLSConfig(tlsCfg *types.TLSConfig) (*tls.Config, error) {
 	}
 
 	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
+		Certificates:	[]tls.Certificate{cert},
+		MinVersion:	tls.VersionTLS12,
 		CipherSuites: []uint16{
 			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
@@ -42,11 +42,11 @@ func redirectToHTTPS(tlsAddr string) http.Handler {
 
 func newTLSServer(addr string, handler http.Handler, tlsCfg *tls.Config) *http.Server {
 	return &http.Server{
-		Addr:         addr,
-		Handler:      handler,
-		TLSConfig:    tlsCfg,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 60 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:		addr,
+		Handler:	handler,
+		TLSConfig:	tlsCfg,
+		ReadTimeout:	15 * time.Second,
+		WriteTimeout:	60 * time.Second,
+		IdleTimeout:	120 * time.Second,
 	}
 }

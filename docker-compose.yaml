@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ousia-local
+    container_name: ousia-gateway
+    ports:
+      - "8080:8080" # Edge HTTP Port
+      - "9000:9000" # Admin & Control Plane API
+    networks:
+      - ousia-mesh
+
+  service-a:
+    image: traefik/whoami
+    container_name: service-a
+    networks:
+      - ousia-mesh
+
+  service-a-sidecar:
+    image: ousia-local
+    container_name: service-a-sidecar
+    depends_on:
+      - service-a
+      - gateway
+    network_mode: "service:service-a"
+    command: >
+      sidecar
+      -admin-url http://gateway:9000
+      -service-id service-a
+      -local-port 80
+      -inbound-port 15000
+      -outbound-port 15001
+
+  service-b:
+    image: traefik/whoami
+    container_name: service-b
+    networks:
+      - ousia-mesh
+
+  service-b-sidecar:
+    image: ousia-local
+    container_name: service-b-sidecar
+    depends_on:
+      - service-b
+      - gateway
+    network_mode: "service:service-b"
+    command: >
+      sidecar
+      -admin-url http://gateway:9000
+      -service-id service-b
+      -local-port 80
+      -inbound-port 15000
+      -outbound-port 15001
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ousia-prometheus
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - ousia-mesh
+
+networks:
+  ousia-mesh:
+    driver: bridge

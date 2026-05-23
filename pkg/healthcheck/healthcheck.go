@@ -11,32 +11,32 @@ import (
 )
 
 type Config struct {
-	Path          string
-	Interval      time.Duration
-	Timeout       time.Duration
-	FailThreshold int
+	Path		string
+	Interval	time.Duration
+	Timeout		time.Duration
+	FailThreshold	int
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Path:          "/healthz",
-		Interval:      10 * time.Second,
-		Timeout:       2 * time.Second,
-		FailThreshold: 2,
+		Path:		"/healthz",
+		Interval:	10 * time.Second,
+		Timeout:	2 * time.Second,
+		FailThreshold:	2,
 	}
 }
 
 type Checker struct {
-	cfg       Config
-	endpoints []*types.Endpoint
-	mu        sync.Mutex
-	client    *http.Client
+	cfg		Config
+	endpoints	[]*types.Endpoint
+	mu		sync.Mutex
+	client		*http.Client
 }
 
 func New(endpoints []*types.Endpoint, cfg Config) *Checker {
 	return &Checker{
-		cfg:       cfg,
-		endpoints: endpoints,
+		cfg:		cfg,
+		endpoints:	endpoints,
 		client: &http.Client{
 			Timeout: cfg.Timeout,
 		},

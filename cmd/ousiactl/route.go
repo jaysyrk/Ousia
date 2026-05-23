@@ -12,13 +12,13 @@ import (
 )
 
 var routeCmd = &cobra.Command{
-	Use:   "route",
-	Short: "Manage routing rules",
+	Use:	"route",
+	Short:	"Manage routing rules",
 }
 
 var routeListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all routes",
+	Use:	"list",
+	Short:	"List all routes",
 	Run: func(cmd *cobra.Command, args []string) {
 		resp, err := client.Get(adminURL + "/api/routes")
 		if err != nil {
@@ -39,8 +39,8 @@ var routeListCmd = &cobra.Command{
 }
 
 var routeAddCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Add a new route",
+	Use:	"add",
+	Short:	"Add a new route",
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetString("id")
 		vhost, _ := cmd.Flags().GetString("virtual-host")
@@ -48,10 +48,10 @@ var routeAddCmd = &cobra.Command{
 		prefix, _ := cmd.Flags().GetString("path-prefix")
 
 		payload := map[string]interface{}{
-			"id":           id,
-			"virtual_host": vhost,
-			"upstream":     upstream,
-			"priority":     100, // Default priority
+			"id":		id,
+			"virtual_host":	vhost,
+			"upstream":	upstream,
+			"priority":	100,
 		}
 		if prefix != "" {
 			payload["path_prefix"] = prefix
@@ -75,9 +75,9 @@ var routeAddCmd = &cobra.Command{
 }
 
 var routeDeleteCmd = &cobra.Command{
-	Use:   "delete [id]",
-	Short: "Delete a route by ID",
-	Args:  cobra.ExactArgs(1),
+	Use:	"delete [id]",
+	Short:	"Delete a route by ID",
+	Args:	cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
 		req, _ := http.NewRequest(http.MethodDelete, adminURL+"/api/routes/"+id, nil)

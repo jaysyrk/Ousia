@@ -8,13 +8,13 @@ import (
 )
 
 type connEndpoint struct {
-	ep     *types.Endpoint
-	active atomic.Int64
+	ep	*types.Endpoint
+	active	atomic.Int64
 }
 
 type LeastConn struct {
-	mu      sync.RWMutex
-	entries []*connEndpoint
+	mu	sync.RWMutex
+	entries	[]*connEndpoint
 }
 
 func NewLeastConn(endpoints []*types.Endpoint) *LeastConn {

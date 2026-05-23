@@ -12,13 +12,13 @@ import (
 )
 
 var upstreamCmd = &cobra.Command{
-	Use:   "upstream",
-	Short: "Manage upstream pools and endpoints",
+	Use:	"upstream",
+	Short:	"Manage upstream pools and endpoints",
 }
 
 var upstreamListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all upstream pools and their endpoints",
+	Use:	"list",
+	Short:	"List all upstream pools and their endpoints",
 	Run: func(cmd *cobra.Command, args []string) {
 		resp, err := client.Get(adminURL + "/api/upstreams")
 		if err != nil {
@@ -39,8 +39,8 @@ var upstreamListCmd = &cobra.Command{
 }
 
 var upstreamAddEndpointCmd = &cobra.Command{
-	Use:   "add-endpoint",
-	Short: "Add an endpoint to an upstream pool",
+	Use:	"add-endpoint",
+	Short:	"Add an endpoint to an upstream pool",
 	Run: func(cmd *cobra.Command, args []string) {
 		pool, _ := cmd.Flags().GetString("pool")
 		id, _ := cmd.Flags().GetString("id")
@@ -48,9 +48,9 @@ var upstreamAddEndpointCmd = &cobra.Command{
 		weight, _ := cmd.Flags().GetInt("weight")
 
 		payload := map[string]interface{}{
-			"id":      id,
-			"address": address,
-			"weight":  weight,
+			"id":		id,
+			"address":	address,
+			"weight":	weight,
 		}
 
 		data, _ := json.Marshal(payload)
@@ -71,8 +71,8 @@ var upstreamAddEndpointCmd = &cobra.Command{
 }
 
 var upstreamRemoveEndpointCmd = &cobra.Command{
-	Use:   "remove-endpoint",
-	Short: "Remove an endpoint from an upstream pool",
+	Use:	"remove-endpoint",
+	Short:	"Remove an endpoint from an upstream pool",
 	Run: func(cmd *cobra.Command, args []string) {
 		pool, _ := cmd.Flags().GetString("pool")
 		id, _ := cmd.Flags().GetString("id")

@@ -8,24 +8,24 @@ import (
 )
 
 type rateLimiter struct {
-	mu       sync.Mutex
-	clients  map[string]*bucket
-	rate     int
-	burst    int
-	interval time.Duration
+	mu		sync.Mutex
+	clients		map[string]*bucket
+	rate		int
+	burst		int
+	interval	time.Duration
 }
 
 type bucket struct {
-	tokens   int
-	lastSeen time.Time
+	tokens		int
+	lastSeen	time.Time
 }
 
 func RateLimit(requestsPerSecond int, burst int) Middleware {
 	rl := &rateLimiter{
-		clients:  make(map[string]*bucket),
-		rate:     requestsPerSecond,
-		burst:    burst,
-		interval: time.Second,
+		clients:	make(map[string]*bucket),
+		rate:		requestsPerSecond,
+		burst:		burst,
+		interval:	time.Second,
 	}
 
 	go rl.cleanup()

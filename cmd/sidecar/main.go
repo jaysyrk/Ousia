@@ -29,15 +29,14 @@ func main() {
 	}
 
 	cfg := &types.SidecarConfig{
-		ServiceID:       *serviceID,
-		InboundPort:     *inboundPort,
-		OutboundPort:    *outboundPort,
-		LocalPort:       *localPort,
-		AdminURL:        *adminURL,
-		RefreshInterval: *refreshInterval,
+		ServiceID:		*serviceID,
+		InboundPort:		*inboundPort,
+		OutboundPort:		*outboundPort,
+		LocalPort:		*localPort,
+		AdminURL:		*adminURL,
+		RefreshInterval:	*refreshInterval,
 	}
 
-	// Generate a unique instance ID for mesh registration
 	hostname, _ := os.Hostname()
 	instanceID := fmt.Sprintf("%s-%s-%d", cfg.ServiceID, hostname, cfg.InboundPort)
 
@@ -48,7 +47,6 @@ func main() {
 	defer cancel()
 	go discovery.Start(ctx)
 
-	// Register with the service mesh
 	registrar := gateway.NewSidecarRegistrar(
 		cfg.AdminURL,
 		cfg.ServiceID,
@@ -80,6 +78,6 @@ func main() {
 	fmt.Printf("Ousia sidecar started for service %q (instance: %s)\n", cfg.ServiceID, instanceID)
 	<-quit
 	fmt.Println("sidecar shutting down, deregistering from mesh...")
-	cancel()                           // triggers deregister in registrar
-	time.Sleep(500 * time.Millisecond) // brief grace period for deregister call
+	cancel()
+	time.Sleep(500 * time.Millisecond)
 }

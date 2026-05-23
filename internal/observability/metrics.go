@@ -11,49 +11,49 @@ import (
 )
 
 var (
-	RequestsTotal = prometheus.NewCounterVec(
+	RequestsTotal	= prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ousia_requests_total",
-			Help: "Total number of requests processed by the gateway.",
+			Name:	"ousia_requests_total",
+			Help:	"Total number of requests processed by the gateway.",
 		},
 		[]string{"method", "host", "upstream", "status"},
 	)
 
-	RequestDuration = prometheus.NewHistogramVec(
+	RequestDuration	= prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "ousia_request_duration_ms",
-			Help:    "Request duration in milliseconds.",
-			Buckets: []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
+			Name:		"ousia_request_duration_ms",
+			Help:		"Request duration in milliseconds.",
+			Buckets:	[]float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
 		},
 		[]string{"method", "host", "upstream"},
 	)
 
-	ActiveConnections = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "ousia_active_connections",
-		Help: "Number of active connections being handled.",
+	ActiveConnections	= prometheus.NewGauge(prometheus.GaugeOpts{
+		Name:	"ousia_active_connections",
+		Help:	"Number of active connections being handled.",
 	})
 
-	HealthyEndpoints = prometheus.NewGaugeVec(
+	HealthyEndpoints	= prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "ousia_healthy_endpoints",
-			Help: "Number of healthy endpoints per upstream pool.",
+			Name:	"ousia_healthy_endpoints",
+			Help:	"Number of healthy endpoints per upstream pool.",
 		},
 		[]string{"pool"},
 	)
 
-	MeshRequestsTotal = prometheus.NewCounterVec(
+	MeshRequestsTotal	= prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ousia_mesh_requests_total",
-			Help: "Total number of service-to-service requests in the mesh.",
+			Name:	"ousia_mesh_requests_total",
+			Help:	"Total number of service-to-service requests in the mesh.",
 		},
 		[]string{"source", "destination", "status", "method"},
 	)
 
-	MeshRequestDuration = prometheus.NewHistogramVec(
+	MeshRequestDuration	= prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "ousia_mesh_request_duration_ms",
-			Help:    "Service-to-service request duration in milliseconds.",
-			Buckets: []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
+			Name:		"ousia_mesh_request_duration_ms",
+			Help:		"Service-to-service request duration in milliseconds.",
+			Buckets:	[]float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
 		},
 		[]string{"source", "destination", "method"},
 	)
@@ -95,7 +95,7 @@ func GetStatsJSON() map[string]interface{} {
 		if mf.Name == nil {
 			continue
 		}
-		
+
 		var metricsList []map[string]interface{}
 		for _, m := range mf.Metric {
 			metricData := make(map[string]interface{})

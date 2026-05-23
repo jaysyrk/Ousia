@@ -15,9 +15,9 @@ var adminURL string
 var client = &http.Client{Timeout: 5 * time.Second}
 
 var rootCmd = &cobra.Command{
-	Use:   "ousiactl",
-	Short: "ousiactl is the CLI for the Ousia Service Mesh",
-	Long:  `A fast and flexible CLI for managing the Ousia Edge Gateway and Service Mesh.`,
+	Use:	"ousiactl",
+	Short:	"ousiactl is the CLI for the Ousia Service Mesh",
+	Long:	`A fast and flexible CLI for managing the Ousia Edge Gateway and Service Mesh.`,
 }
 
 func main() {
@@ -33,13 +33,9 @@ func init() {
 	rootCmd.AddCommand(metricsCmd)
 }
 
-// ---------------------------------------------------------------------------
-// STATUS COMMAND
-// ---------------------------------------------------------------------------
-
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Check the health of the Ousia Gateway",
+	Use:	"status",
+	Short:	"Check the health of the Ousia Gateway",
 	Run: func(cmd *cobra.Command, args []string) {
 		resp, err := client.Get(adminURL + "/api/health")
 		if err != nil {
@@ -67,13 +63,9 @@ var statusCmd = &cobra.Command{
 	},
 }
 
-// ---------------------------------------------------------------------------
-// METRICS COMMAND
-// ---------------------------------------------------------------------------
-
 var metricsCmd = &cobra.Command{
-	Use:   "metrics",
-	Short: "View consolidated mesh and gateway metrics",
+	Use:	"metrics",
+	Short:	"View consolidated mesh and gateway metrics",
 	Run: func(cmd *cobra.Command, args []string) {
 		resp, err := client.Get(adminURL + "/api/stats")
 		if err != nil {
@@ -88,7 +80,7 @@ var metricsCmd = &cobra.Command{
 		}
 
 		body, _ := io.ReadAll(resp.Body)
-		// Pretty print the JSON
+
 		var parsed map[string]interface{}
 		if err := json.Unmarshal(body, &parsed); err == nil {
 			pretty, _ := json.MarshalIndent(parsed, "", "  ")

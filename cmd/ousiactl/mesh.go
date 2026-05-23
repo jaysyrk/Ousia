@@ -10,13 +10,13 @@ import (
 )
 
 var meshCmd = &cobra.Command{
-	Use:   "mesh",
-	Short: "Manage service mesh instances",
+	Use:	"mesh",
+	Short:	"Manage service mesh instances",
 }
 
 var meshListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all registered service instances in the mesh",
+	Use:	"list",
+	Short:	"List all registered service instances in the mesh",
 	Run: func(cmd *cobra.Command, args []string) {
 		resp, err := client.Get(adminURL + "/api/mesh/services")
 		if err != nil {
