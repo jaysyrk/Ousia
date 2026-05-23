@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jaysyrk/ousia/internal/balancer"
+	"github.com/jaysyrk/ousia/internal/observability"
 	"github.com/jaysyrk/ousia/internal/router"
 	"github.com/jaysyrk/ousia/pkg/types"
 )
@@ -46,7 +47,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		req.Header.Set(key, val)
 	}
 
-	forward(w, req, endpoint, route)
+	wrapped := observability.Middleware(route.Action.UpstreamPool, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		forward(w, req, endpoint, route)
+	}))
+
+	wrapped.ServeHTTP(w, req)
 }
 
 func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route *types.Route) {

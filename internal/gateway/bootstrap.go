@@ -7,6 +7,7 @@ import (
 
 	"github.com/jaysyrk/ousia/internal/balancer"
 	"github.com/jaysyrk/ousia/internal/controlplane"
+	"github.com/jaysyrk/ousia/internal/observability"
 	"github.com/jaysyrk/ousia/internal/router"
 	"github.com/jaysyrk/ousia/pkg/config"
 	"github.com/jaysyrk/ousia/pkg/healthcheck"
@@ -14,6 +15,10 @@ import (
 )
 
 func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
+	observability.InitLogger()
+	observability.InitMetrics()
+	observability.StartAdminServer(cfg.Gateway.AdminAddr)
+
 	virtualHosts, err := buildVirtualHosts(cfg)
 	if err != nil {
 		return nil, err
