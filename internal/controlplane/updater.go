@@ -1,48 +1,22 @@
-package gateway
+package controlplane
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	"github.com/jaysyrk/ousia/internal/balancer"
-	"github.com/jaysyrk/ousia/internal/controlplane"
 	"github.com/jaysyrk/ousia/internal/router"
 	"github.com/jaysyrk/ousia/pkg/config"
-	"github.com/jaysyrk/ousia/pkg/healthcheck"
 	"github.com/jaysyrk/ousia/pkg/types"
 )
 
-func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
-	virtualHosts, err := buildVirtualHosts(cfg)
-	if err != nil {
-		return nil, err
+func BuildUpdateFunc(r *router.Router, balancers map[string]balancer.Balancer) UpdateFunc {
+	return func(cfg *config.OusiaConfig) {
+		applyVirtualHosts(r, cfg)
+		applyUpstreams(balancers, cfg)
 	}
-
-	balancers, allEndpoints, err := buildBalancers(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	hc := healthcheck.New(allEndpoints, healthcheck.DefaultConfig())
-	hc.Start(context.Background())
-
-	r := router.New(virtualHosts)
-	h := NewHandler(r, balancers)
-	s := NewServer(cfg.Gateway.ListenAddr, h)
-
-	store := controlplane.NewStore(cfg)
-	watcher := controlplane.NewWatcher(configPath, store, 5*time.Second)
-	watcher.OnChange(controlplane.BuildUpdateFunc(r, balancers))
-
-	go watcher.Start(context.Background())
-
-	return s, nil
 }
 
-func buildVirtualHosts(cfg *config.OusiaConfig) ([]*types.VirtualHost, error) {
-	var hosts []*types.VirtualHost
-
+func applyVirtualHosts(r *router.Router, cfg *config.OusiaConfig) {
 	for _, vhCfg := range cfg.VirtualHosts {
 		vh := &types.VirtualHost{
 			Hostname: vhCfg.Hostname,
@@ -75,16 +49,12 @@ func buildVirtualHosts(cfg *config.OusiaConfig) ([]*types.VirtualHost, error) {
 			vh.Routes = append(vh.Routes, route)
 		}
 
-		hosts = append(hosts, vh)
+		r.AddVirtualHost(vh)
+		fmt.Printf("updater: applied virtual host %q\n", vh.Hostname)
 	}
-
-	return hosts, nil
 }
 
-func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, []*types.Endpoint, error) {
-	balancers := make(map[string]balancer.Balancer)
-	var allEndpoints []*types.Endpoint
-
+func applyUpstreams(balancers map[string]balancer.Balancer, cfg *config.OusiaConfig) {
 	for _, upCfg := range cfg.Upstreams {
 		var endpoints []*types.Endpoint
 
@@ -93,15 +63,13 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, []*t
 			if w == 0 {
 				w = 1
 			}
-			ep := &types.Endpoint{
+			endpoints = append(endpoints, &types.Endpoint{
 				ID:       epCfg.ID,
 				Address:  epCfg.Address,
 				Weight:   w,
 				Healthy:  true,
 				Metadata: epCfg.Meta,
-			}
-			endpoints = append(endpoints, ep)
-			allEndpoints = append(allEndpoints, ep)
+			})
 		}
 
 		pool := &types.UpstreamPool{
@@ -112,11 +80,11 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, []*t
 
 		lb, err := balancer.New(pool)
 		if err != nil {
-			return nil, nil, fmt.Errorf("bootstrap: %w", err)
+			fmt.Printf("updater: skipping upstream %q: %v\n", upCfg.Name, err)
+			continue
 		}
 
 		balancers[upCfg.Name] = lb
+		fmt.Printf("updater: applied upstream %q with %d endpoint(s)\n", upCfg.Name, len(endpoints))
 	}
-
-	return balancers, allEndpoints, nil
 }

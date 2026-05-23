@@ -12,12 +12,14 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load("ousia.yaml")
+	configPath := "ousia.yaml"
+
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	srv, err := gateway.Bootstrap(cfg)
+	srv, err := gateway.Bootstrap(cfg, configPath)
 	if err != nil {
 		log.Fatalf("failed to bootstrap gateway: %v", err)
 	}
