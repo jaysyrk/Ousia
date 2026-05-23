@@ -47,3 +47,9 @@ func (rr *RoundRobin) Remove(id string) {
 	}
 	rr.endpoints = filtered
 }
+
+func (rr *RoundRobin) Endpoints() []*types.Endpoint {
+	rr.mu.RLock()
+	defer rr.mu.RUnlock()
+	return rr.endpoints
+}

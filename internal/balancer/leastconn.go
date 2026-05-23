@@ -8,8 +8,8 @@ import (
 )
 
 type connEndpoint struct {
-	ep      *types.Endpoint
-	active  atomic.Int64
+	ep     *types.Endpoint
+	active atomic.Int64
 }
 
 type LeastConn struct {
@@ -74,4 +74,14 @@ func (lc *LeastConn) Remove(id string) {
 		}
 	}
 	lc.entries = filtered
+}
+
+func (lc *LeastConn) Endpoints() []*types.Endpoint {
+	lc.mu.RLock()
+	defer lc.mu.RUnlock()
+	eps := make([]*types.Endpoint, len(lc.entries))
+	for i, ce := range lc.entries {
+		eps[i] = ce.ep
+	}
+	return eps
 }

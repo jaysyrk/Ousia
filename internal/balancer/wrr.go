@@ -58,4 +58,10 @@ func (w *WRR) Remove(id string) {
 	w.entries = filtered
 }
 
+func (w *WRR) Endpoints() []*types.Endpoint {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.entries
+}
+
 var weightedCounter atomic.Uint64

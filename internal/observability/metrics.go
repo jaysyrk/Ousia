@@ -47,13 +47,17 @@ func InitMetrics() {
 	prometheus.MustRegister(HealthyEndpoints)
 }
 
-func StartAdminServer(addr string) {
+func StartAdminServer(addr string, register func(*http.ServeMux)) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "ok")
 	})
+
+	if register != nil {
+		register(mux)
+	}
 
 	go func() {
 		fmt.Printf("Ousia admin server listening on %s\n", addr)

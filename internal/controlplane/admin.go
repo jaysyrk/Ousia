@@ -18,13 +18,15 @@ type AdminAPI struct {
 	router    *router.Router
 	balancers map[string]balancer.Balancer
 	store     *Store
+	mesh      *MeshRegistry
 }
 
-func NewAdminAPI(r *router.Router, balancers map[string]balancer.Balancer, store *Store) *AdminAPI {
+func NewAdminAPI(r *router.Router, balancers map[string]balancer.Balancer, store *Store, mesh *MeshRegistry) *AdminAPI {
 	return &AdminAPI{
 		router:    r,
 		balancers: balancers,
 		store:     store,
+		mesh:      mesh,
 	}
 }
 
@@ -34,6 +36,12 @@ func (a *AdminAPI) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/upstreams", a.handleUpstreams)
 	mux.HandleFunc("/api/upstreams/", a.handleUpstreamEndpoints)
 	mux.HandleFunc("/api/health", a.handleHealth)
+
+	// Service mesh endpoints
+	mux.HandleFunc("/api/mesh/register", a.handleMeshRegister)
+	mux.HandleFunc("/api/mesh/heartbeat", a.handleMeshHeartbeat)
+	mux.HandleFunc("/api/mesh/deregister", a.handleMeshDeregister)
+	mux.HandleFunc("/api/mesh/services", a.handleMeshServices)
 }
 
 func (a *AdminAPI) handleRoutes(w http.ResponseWriter, r *http.Request) {
@@ -644,4 +652,139 @@ func parseDurationOrZero(value string) time.Duration {
 	}
 	d, _ := time.ParseDuration(value)
 	return d
+}
+
+// ---------------------------------------------------------------------------
+// Service Mesh Handlers
+// ---------------------------------------------------------------------------
+
+func (a *AdminAPI) handleMeshRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		ServiceID  string            `json:"service_id"`
+		InstanceID string            `json:"instance_id"`
+		Address    string            `json:"address"`
+		Port       int               `json:"port"`
+		Meta       map[string]string `json:"meta,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if body.ServiceID == "" || body.InstanceID == "" || body.Address == "" || body.Port == 0 {
+		http.Error(w, "service_id, instance_id, address, and port are required", http.StatusBadRequest)
+		return
+	}
+
+	inst := &ServiceInstance{
+		ServiceID:  body.ServiceID,
+		InstanceID: body.InstanceID,
+		Address:    body.Address,
+		Port:       body.Port,
+		Meta:       body.Meta,
+	}
+
+	a.mesh.Register(inst)
+	fmt.Printf("mesh: registered instance %q for service %q at %s:%d\n", inst.InstanceID, inst.ServiceID, inst.Address, inst.Port)
+	writeJSON(w, http.StatusCreated, map[string]any{"message": "registered", "instance_id": inst.InstanceID})
+}
+
+func (a *AdminAPI) handleMeshHeartbeat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		InstanceID string `json:"instance_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if body.InstanceID == "" {
+		http.Error(w, "instance_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if !a.mesh.Heartbeat(body.InstanceID) {
+		http.Error(w, "instance not found", http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"message": "heartbeat acknowledged", "instance_id": body.InstanceID})
+}
+
+func (a *AdminAPI) handleMeshDeregister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		InstanceID string `json:"instance_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if body.InstanceID == "" {
+		http.Error(w, "instance_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if !a.mesh.Deregister(body.InstanceID) {
+		http.Error(w, "instance not found", http.StatusNotFound)
+		return
+	}
+
+	fmt.Printf("mesh: deregistered instance %q\n", body.InstanceID)
+	writeJSON(w, http.StatusOK, map[string]any{"message": "deregistered", "instance_id": body.InstanceID})
+}
+
+func (a *AdminAPI) handleMeshServices(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	type instanceResponse struct {
+		InstanceID    string            `json:"instance_id"`
+		Address       string            `json:"address"`
+		Port          int               `json:"port"`
+		Meta          map[string]string `json:"meta,omitempty"`
+		LastHeartbeat string            `json:"last_heartbeat"`
+	}
+	type serviceResponse struct {
+		ServiceID string             `json:"service_id"`
+		Instances []instanceResponse `json:"instances"`
+	}
+
+	serviceMap := make(map[string][]instanceResponse)
+	for _, inst := range a.mesh.Instances() {
+		serviceMap[inst.ServiceID] = append(serviceMap[inst.ServiceID], instanceResponse{
+			InstanceID:    inst.InstanceID,
+			Address:       inst.Address,
+			Port:          inst.Port,
+			Meta:          inst.Meta,
+			LastHeartbeat: inst.LastHeartbeat.Format(time.RFC3339),
+		})
+	}
+
+	var services []serviceResponse
+	for svcID, instances := range serviceMap {
+		services = append(services, serviceResponse{
+			ServiceID: svcID,
+			Instances: instances,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"services": services, "count": len(services)})
 }

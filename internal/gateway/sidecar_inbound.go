@@ -2,11 +2,10 @@ package gateway
 
 import (
 	"fmt"
-	"io"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 )
 
 type InboundProxy struct {
@@ -34,49 +33,52 @@ func (p *InboundProxy) Start(listenAddr string) error {
 }
 
 type OutboundProxy struct {
-	upstreams map[string]string
+	mapper *ServiceMapper
 }
 
-func NewOutboundProxy(upstreams map[string]string) *OutboundProxy {
-	return &OutboundProxy{upstreams: upstreams}
+func NewOutboundProxy(mapper *ServiceMapper) *OutboundProxy {
+	return &OutboundProxy{mapper: mapper}
 }
 
 func (p *OutboundProxy) Start(listenAddr string) error {
+	server := &http.Server{Addr: listenAddr, Handler: p}
 	fmt.Printf("sidecar outbound: listening on %s\n", listenAddr)
-	ln, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		return err
-	}
-
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			return err
-		}
-		go p.handle(conn)
-	}
+	return server.ListenAndServe()
 }
 
-func (p *OutboundProxy) handle(conn net.Conn) {
-	defer conn.Close()
-
-	buf := make([]byte, 256)
-	n, err := conn.Read(buf)
-	if err != nil {
-		return
-	}
-
-	target, ok := p.upstreams[string(buf[:n])]
+func (p *OutboundProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	serviceName := serviceNameFromRequest(req)
+	targetHost, ok := p.mapper.Next(serviceName)
 	if !ok {
+		http.Error(w, "service not available", http.StatusBadGateway)
 		return
 	}
 
-	upstream, err := net.Dial("tcp", target)
-	if err != nil {
-		return
-	}
-	defer upstream.Close()
+	target := &url.URL{Scheme: "http", Host: targetHost}
+	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	go io.Copy(upstream, conn)
-	io.Copy(conn, upstream)
+	proxy.Director = func(r *http.Request) {
+		r.URL.Scheme = target.Scheme
+		r.URL.Host = target.Host
+		r.Host = target.Host
+		r.Header.Set("X-Forwarded-Host", req.Host)
+		r.Header.Set("X-Origin-Host", target.Host)
+	}
+
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, "upstream error: "+err.Error(), http.StatusBadGateway)
+	}
+
+	proxy.ServeHTTP(w, req)
+}
+
+func serviceNameFromRequest(req *http.Request) string {
+	if service := req.Header.Get("X-Ousia-Service"); service != "" {
+		return service
+	}
+	host := req.Host
+	if i := strings.IndexByte(host, ':'); i != -1 {
+		host = host[:i]
+	}
+	return host
 }

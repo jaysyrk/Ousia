@@ -18,7 +18,6 @@ import (
 func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 	observability.InitLogger()
 	observability.InitMetrics()
-	observability.StartAdminServer(cfg.Gateway.AdminAddr)
 
 	virtualHosts, err := buildVirtualHosts(cfg)
 	if err != nil {
@@ -57,6 +56,10 @@ func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 	store := controlplane.NewStore(cfg)
 	watcher := controlplane.NewWatcher(configPath, store, 5*time.Second)
 	watcher.OnChange(controlplane.BuildUpdateFunc(r, balancers))
+
+	mesh := controlplane.NewMeshRegistry(30 * time.Second)
+	admin := controlplane.NewAdminAPI(r, balancers, store, mesh)
+	observability.StartAdminServer(cfg.Gateway.AdminAddr, admin.RegisterRoutes)
 
 	go watcher.Start(context.Background())
 
