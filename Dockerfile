@@ -18,6 +18,7 @@ COPY --from=builder /bin/gateway /usr/local/bin/gateway
 COPY --from=builder /bin/sidecar /usr/local/bin/sidecar
 COPY --from=builder /bin/ousiactl /usr/local/bin/ousiactl
 
+COPY certs /app/certs
 COPY ousia.yaml /app/ousia.yaml
 
 EXPOSE 8080 8443 9000
