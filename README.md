@@ -4,7 +4,7 @@ A High-Performance, Dynamic L7 Edge Gateway and Service Mesh in Go.
 
 ## What is Ousia?
 
-Ousia is a lightweight, cloud-native Service Mesh and Edge Gateway designed for developers who want the power of advanced traffic management without the massive operational overhead of larger meshes. It handles inbound edge traffic and transparently manages service-to-service communication via lightweight sidecar proxies, providing load balancing, resiliency, and observability out of the box.
+Ousia empowers small programs on lightweight servers to reliably handle the same massive traffic loads as giant enterprise systems by leveraging advanced load balancing, intelligent routing, and built-in resiliency. It handles inbound edge traffic and transparently manages service-to-service communication via lightweight sidecar proxies, providing load balancing, resiliency, and observability out of the box.
 
 ## Key Features
 
