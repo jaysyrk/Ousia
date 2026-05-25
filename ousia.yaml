@@ -32,8 +32,8 @@ upstreams:
     algorithm: "round-robin"
     endpoints:
       - id: "backend-1"
-        address: "127.0.0.1:9001"
+        address: "service-a:80"
         weight: 1
       - id: "backend-2"
-        address: "127.0.0.1:9002"
+        address: "service-b:80"
         weight: 1
