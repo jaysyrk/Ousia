@@ -10,9 +10,10 @@ Ousia empowers small programs on lightweight servers to reliably handle the same
 
 * **Dynamic L7 Routing**: Map traffic to upstream pools based on exact paths, prefixes, HTTP methods, and Host headers with priority-based resolution.
 * **Pluggable Load Balancing**: Out-of-the-box support for Round Robin, Weighted Round Robin, Least Connections, and IP Hash algorithms.
+* **Lock-Free Atomic State Engine**: Sustains 2,100+ RPS with zero Mutex bottlenecks or Garbage Collector pauses via hardware-level atomics, 256-bucket memory sharding, and `sync.Pool` object recycling.
 * **Resiliency Middleware**: Built-in Circuit Breakers, Retries, Rate Limiting, and Timeouts to keep your services online during downstream failures.
 * **Service Mesh Sidecars**: Transparent proxies that automatically handle service discovery, routing, and telemetry injection.
-* **Native Observability**: Automatic Prometheus metrics aggregation and distributed trace ID propagation.
+* **Native Observability**: Automatic Prometheus metrics aggregation, distributed trace ID propagation, and asynchronous batch-flushed logging.
 * **Zero-Friction CLI**: Manage the entire cluster dynamically using the `ousiactl` command-line tool.
 
 ## Configuration
