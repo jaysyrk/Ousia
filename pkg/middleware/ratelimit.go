@@ -7,25 +7,45 @@ import (
 	"time"
 )
 
+const shardCount = 256
+
+type shard struct {
+	mu      sync.Mutex
+	clients map[string]*bucket
+}
+
 type rateLimiter struct {
-	mu		sync.Mutex
-	clients		map[string]*bucket
-	rate		int
-	burst		int
-	interval	time.Duration
+	shards   [shardCount]*shard
+	rate     int
+	burst    int
+	interval time.Duration
 }
 
 type bucket struct {
-	tokens		int
-	lastSeen	time.Time
+	tokens   int
+	lastSeen time.Time
+}
+
+func hashIP(ip string) uint32 {
+	var hash uint32 = 2166136261
+	for i := 0; i < len(ip); i++ {
+		hash ^= uint32(ip[i])
+		hash *= 16777619
+	}
+	return hash % shardCount
 }
 
 func RateLimit(requestsPerSecond int, burst int) Middleware {
 	rl := &rateLimiter{
-		clients:	make(map[string]*bucket),
-		rate:		requestsPerSecond,
-		burst:		burst,
-		interval:	time.Second,
+		rate:     requestsPerSecond,
+		burst:    burst,
+		interval: time.Second,
+	}
+
+	for i := 0; i < shardCount; i++ {
+		rl.shards[i] = &shard{
+			clients: make(map[string]*bucket),
+		}
 	}
 
 	go rl.cleanup()
@@ -43,12 +63,15 @@ func RateLimit(requestsPerSecond int, burst int) Middleware {
 }
 
 func (rl *rateLimiter) allow(ip string) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
+	idx := hashIP(ip)
+	s := rl.shards[idx]
 
-	b, ok := rl.clients[ip]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	b, ok := s.clients[ip]
 	if !ok {
-		rl.clients[ip] = &bucket{tokens: rl.burst - 1, lastSeen: time.Now()}
+		s.clients[ip] = &bucket{tokens: rl.burst - 1, lastSeen: time.Now()}
 		return true
 	}
 
@@ -72,13 +95,16 @@ func (rl *rateLimiter) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for range ticker.C {
-		rl.mu.Lock()
-		for ip, b := range rl.clients {
-			if time.Since(b.lastSeen) > 10*time.Minute {
-				delete(rl.clients, ip)
+		for i := 0; i < shardCount; i++ {
+			s := rl.shards[i]
+			s.mu.Lock()
+			for ip, b := range s.clients {
+				if time.Since(b.lastSeen) > 10*time.Minute {
+					delete(s.clients, ip)
+				}
 			}
+			s.mu.Unlock()
 		}
-		rl.mu.Unlock()
 	}
 }
 
