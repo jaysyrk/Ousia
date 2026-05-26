@@ -4,26 +4,27 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const shardCount = 256
 
 type shard struct {
-	mu      sync.Mutex
-	clients map[string]*bucket
+	clients sync.Map
 }
 
 type rateLimiter struct {
-	shards   [shardCount]*shard
-	rate     int
-	burst    int
-	interval time.Duration
+	shards     [shardCount]*shard
+	rate       int64
+	burst      int64
+	interval   time.Duration
+	bucketPool sync.Pool
 }
 
 type bucket struct {
-	tokens   int
-	lastSeen time.Time
+	tokens   int64
+	lastSeen int64
 }
 
 func hashIP(ip string) uint32 {
@@ -37,15 +38,18 @@ func hashIP(ip string) uint32 {
 
 func RateLimit(requestsPerSecond int, burst int) Middleware {
 	rl := &rateLimiter{
-		rate:     requestsPerSecond,
-		burst:    burst,
+		rate:     int64(requestsPerSecond),
+		burst:    int64(burst),
 		interval: time.Second,
+		bucketPool: sync.Pool{
+			New: func() interface{} {
+				return &bucket{}
+			},
+		},
 	}
 
 	for i := 0; i < shardCount; i++ {
-		rl.shards[i] = &shard{
-			clients: make(map[string]*bucket),
-		}
+		rl.shards[i] = &shard{}
 	}
 
 	go rl.cleanup()
@@ -66,44 +70,63 @@ func (rl *rateLimiter) allow(ip string) bool {
 	idx := hashIP(ip)
 	s := rl.shards[idx]
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	now := time.Now().UnixNano()
 
-	b, ok := s.clients[ip]
-	if !ok {
-		s.clients[ip] = &bucket{tokens: rl.burst - 1, lastSeen: time.Now()}
+	val, loaded := s.clients.Load(ip)
+	if !loaded {
+		b := rl.bucketPool.Get().(*bucket)
+		atomic.StoreInt64(&b.tokens, rl.burst-1)
+		atomic.StoreInt64(&b.lastSeen, now)
+
+		s.clients.Store(ip, b)
 		return true
 	}
 
-	elapsed := time.Since(b.lastSeen)
-	refill := int(elapsed/rl.interval) * rl.rate
-	b.tokens += refill
-	if b.tokens > rl.burst {
-		b.tokens = rl.burst
-	}
-	b.lastSeen = time.Now()
+	b := val.(*bucket)
+	lastSeen := atomic.LoadInt64(&b.lastSeen)
+	elapsed := time.Duration(now - lastSeen)
 
-	if b.tokens <= 0 {
-		return false
+	refill := int64(elapsed/rl.interval) * rl.rate
+	if refill > 0 {
+		if atomic.CompareAndSwapInt64(&b.lastSeen, lastSeen, now) {
+			atomic.AddInt64(&b.tokens, refill)
+
+			// Cap the tokens at the max burst
+			currentTokens := atomic.LoadInt64(&b.tokens)
+			if currentTokens > rl.burst {
+				atomic.StoreInt64(&b.tokens, rl.burst)
+			}
+		}
 	}
 
-	b.tokens--
-	return true
+	// Lock-free decrement using CAS loop
+	for {
+		currentTokens := atomic.LoadInt64(&b.tokens)
+		if currentTokens <= 0 {
+			return false
+		}
+		if atomic.CompareAndSwapInt64(&b.tokens, currentTokens, currentTokens-1) {
+			return true
+		}
+	}
 }
 
 func (rl *rateLimiter) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for range ticker.C {
+		now := time.Now().UnixNano()
 		for i := 0; i < shardCount; i++ {
 			s := rl.shards[i]
-			s.mu.Lock()
-			for ip, b := range s.clients {
-				if time.Since(b.lastSeen) > 10*time.Minute {
-					delete(s.clients, ip)
+			s.clients.Range(func(key, value interface{}) bool {
+				b := value.(*bucket)
+				lastSeen := atomic.LoadInt64(&b.lastSeen)
+				if time.Duration(now-lastSeen) > 10*time.Minute {
+					s.clients.Delete(key)
+					rl.bucketPool.Put(b)
 				}
-			}
-			s.mu.Unlock()
+				return true
+			})
 		}
 	}
 }
