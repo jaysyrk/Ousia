@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -10,12 +11,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jaysyrk/ousia/internal/observability"
+	"github.com/jaysyrk/ousia/pkg/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type statusRecorder struct {
 	http.ResponseWriter
-	status	int
+	status int
 }
 
 func (r *statusRecorder) WriteHeader(code int) {
@@ -24,8 +26,8 @@ func (r *statusRecorder) WriteHeader(code int) {
 }
 
 type InboundProxy struct {
-	localPort	int
-	serviceID	string
+	localPort int
+	serviceID string
 }
 
 func NewInboundProxy(localPort int, serviceID string) *InboundProxy {
@@ -34,8 +36,8 @@ func NewInboundProxy(localPort int, serviceID string) *InboundProxy {
 
 func (p *InboundProxy) Start(listenAddr string) error {
 	target := &url.URL{
-		Scheme:	"http",
-		Host:	fmt.Sprintf("127.0.0.1:%d", p.localPort),
+		Scheme: "http",
+		Host:   fmt.Sprintf("127.0.0.1:%d", p.localPort),
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
@@ -72,13 +74,23 @@ func (p *InboundProxy) Start(listenAddr string) error {
 		observability.RequestLog(traceID, req.Method, req.URL.Path, req.Host, "local:"+fmt.Sprint(p.localPort), rec.status, durationMs)
 	})
 
+	var finalHandler http.Handler = handler
+	wasmPath := "plugin.wasm"
+	wasmMiddleware, err := middleware.NewWasmMiddleware(context.Background(), wasmPath, handler)
+	if err == nil {
+		fmt.Println("sidecar inbound: WASM plugin loaded successfully!")
+		finalHandler = wasmMiddleware
+	} else {
+		fmt.Printf("sidecar inbound: WASM plugin not loaded (%v), continuing without it...\n", err)
+	}
+
 	fmt.Printf("sidecar inbound: listening on %s → local :%d\n", listenAddr, p.localPort)
-	return http.ListenAndServe(listenAddr, handler)
+	return http.ListenAndServe(listenAddr, finalHandler)
 }
 
 type OutboundProxy struct {
-	mapper		*ServiceMapper
-	serviceID	string
+	mapper    *ServiceMapper
+	serviceID string
 }
 
 func NewOutboundProxy(mapper *ServiceMapper, serviceID string) *OutboundProxy {
