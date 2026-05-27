@@ -9,61 +9,80 @@ import (
 )
 
 type OusiaConfig struct {
-	Gateway		GatewayConfig		`yaml:"gateway"`
-	VirtualHosts	[]VirtualHostConfig	`yaml:"virtual_hosts"`
-	Upstreams	[]UpstreamConfig	`yaml:"upstreams"`
+	Gateway      GatewayConfig       `yaml:"gateway"`
+	VirtualHosts []VirtualHostConfig `yaml:"virtual_hosts"`
+	Upstreams    []UpstreamConfig    `yaml:"upstreams"`
 }
 
 type GatewayConfig struct {
-	ListenAddr	string	`yaml:"listen_addr"`
-	TLSAddr		string	`yaml:"tls_addr"`
-	AdminAddr	string	`yaml:"admin_addr"`
+	ListenAddr string `yaml:"listen_addr"`
+	TLSAddr    string `yaml:"tls_addr"`
+	AdminAddr  string `yaml:"admin_addr"`
 }
 
 type VirtualHostConfig struct {
-	Hostname	string		`yaml:"hostname"`
-	TLS		*TLSConfig	`yaml:"tls,omitempty"`
-	Routes		[]RouteConfig	`yaml:"routes"`
+	Hostname  string           `yaml:"hostname"`
+	TLS       *TLSConfig       `yaml:"tls,omitempty"`
+	Routes    []RouteConfig    `yaml:"routes"`
+	RateLimit *RateLimitConfig `yaml:"rate_limit,omitempty"`
+}
+
+type RateLimitConfig struct {
+	RequestsPerSecond int    `yaml:"requests_per_second"`
+	Burst             int    `yaml:"burst"`
+	KeyBy             string `yaml:"key_by,omitempty"`
 }
 
 type TLSConfig struct {
-	CertFile	string	`yaml:"cert_file"`
-	KeyFile		string	`yaml:"key_file"`
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
 }
 
 type RouteConfig struct {
-	ID		string		`yaml:"id"`
-	Priority	int		`yaml:"priority"`
-	Match		MatchConfig	`yaml:"match"`
-	Action		ActionConfig	`yaml:"action"`
+	ID       string       `yaml:"id"`
+	Priority int          `yaml:"priority"`
+	Match    MatchConfig  `yaml:"match"`
+	Action   ActionConfig `yaml:"action"`
 }
 
 type MatchConfig struct {
-	PathPrefix	string			`yaml:"path_prefix,omitempty"`
-	PathExact	string			`yaml:"path_exact,omitempty"`
-	Methods		[]string		`yaml:"methods,omitempty"`
-	Headers		map[string]string	`yaml:"headers,omitempty"`
+	PathPrefix string            `yaml:"path_prefix,omitempty"`
+	PathExact  string            `yaml:"path_exact,omitempty"`
+	Methods    []string          `yaml:"methods,omitempty"`
+	Headers    map[string]string `yaml:"headers,omitempty"`
 }
 
 type ActionConfig struct {
-	Upstream	string			`yaml:"upstream"`
-	StripPrefix	string			`yaml:"strip_prefix,omitempty"`
-	AddHeaders	map[string]string	`yaml:"add_headers,omitempty"`
-	Timeout		string			`yaml:"timeout,omitempty"`
-	RetryCount	int			`yaml:"retry_count,omitempty"`
+	Upstream          string            `yaml:"upstream"`
+	StripPrefix       string            `yaml:"strip_prefix,omitempty"`
+	AddHeaders        map[string]string `yaml:"add_headers,omitempty"`
+	RemoveHeaders     []string          `yaml:"remove_headers,omitempty"`
+	AddRespHeaders    map[string]string `yaml:"add_resp_headers,omitempty"`
+	RemoveRespHeaders []string          `yaml:"remove_resp_headers,omitempty"`
+	Timeout           string            `yaml:"timeout,omitempty"`
+	RetryCount        int               `yaml:"retry_count,omitempty"`
 }
 
 type UpstreamConfig struct {
-	Name		string			`yaml:"name"`
-	Algorithm	string			`yaml:"algorithm"`
-	Endpoints	[]EndpointConfig	`yaml:"endpoints"`
+	Name        string            `yaml:"name"`
+	Algorithm   string            `yaml:"algorithm"`
+	Endpoints   []EndpointConfig  `yaml:"endpoints"`
+	HealthCheck HealthCheckConfig `yaml:"health_check,omitempty"`
+}
+
+type HealthCheckConfig struct {
+	Path             string `yaml:"path,omitempty"`
+	Interval         string `yaml:"interval,omitempty"`
+	Timeout          string `yaml:"timeout,omitempty"`
+	FailThreshold    int    `yaml:"fail_threshold,omitempty"`
+	SuccessThreshold int    `yaml:"success_threshold,omitempty"`
 }
 
 type EndpointConfig struct {
-	ID	string			`yaml:"id"`
-	Address	string			`yaml:"address"`
-	Weight	int			`yaml:"weight,omitempty"`
-	Meta	map[string]string	`yaml:"meta,omitempty"`
+	ID      string            `yaml:"id"`
+	Address string            `yaml:"address"`
+	Weight  int               `yaml:"weight,omitempty"`
+	Meta    map[string]string `yaml:"meta,omitempty"`
 }
 
 func Load(path string) (*OusiaConfig, error) {

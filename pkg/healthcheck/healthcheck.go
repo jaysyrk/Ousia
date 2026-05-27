@@ -11,32 +11,34 @@ import (
 )
 
 type Config struct {
-	Path		string
-	Interval	time.Duration
-	Timeout		time.Duration
-	FailThreshold	int
+	Path             string
+	Interval         time.Duration
+	Timeout          time.Duration
+	FailThreshold    int
+	SuccessThreshold int
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Path:		"/healthz",
-		Interval:	10 * time.Second,
-		Timeout:	2 * time.Second,
-		FailThreshold:	2,
+		Path:             "/healthz",
+		Interval:         10 * time.Second,
+		Timeout:          2 * time.Second,
+		FailThreshold:    2,
+		SuccessThreshold: 2,
 	}
 }
 
 type Checker struct {
-	cfg		Config
-	endpoints	[]*types.Endpoint
-	mu		sync.Mutex
-	client		*http.Client
+	cfg       Config
+	endpoints []*types.Endpoint
+	mu        sync.Mutex
+	client    *http.Client
 }
 
 func New(endpoints []*types.Endpoint, cfg Config) *Checker {
 	return &Checker{
-		cfg:		cfg,
-		endpoints:	endpoints,
+		cfg:       cfg,
+		endpoints: endpoints,
 		client: &http.Client{
 			Timeout: cfg.Timeout,
 		},
@@ -60,6 +62,7 @@ func (c *Checker) watch(ctx context.Context, ep *types.Endpoint) {
 	defer ticker.Stop()
 
 	failures := 0
+	successes := 0
 
 	for {
 		select {
@@ -68,19 +71,27 @@ func (c *Checker) watch(ctx context.Context, ep *types.Endpoint) {
 		case <-ticker.C:
 			err := c.probe(ep)
 			if err != nil {
+				successes = 0
 				failures++
 				if failures >= c.cfg.FailThreshold {
 					if ep.Healthy {
 						ep.Healthy = false
+						failures = 0
 						fmt.Printf("healthcheck: endpoint %s (%s) marked unhealthy: %v\n", ep.ID, ep.Address, err)
 					}
 				}
 			} else {
-				if !ep.Healthy {
-					fmt.Printf("healthcheck: endpoint %s (%s) recovered\n", ep.ID, ep.Address)
-				}
 				failures = 0
-				ep.Healthy = true
+				successes++
+				if !ep.Healthy {
+					if successes >= c.cfg.SuccessThreshold {
+						ep.Healthy = true
+						successes = 0
+						fmt.Printf("healthcheck: endpoint %s (%s) recovered\n", ep.ID, ep.Address)
+					}
+				} else {
+					successes = 0
+				}
 			}
 		}
 	}

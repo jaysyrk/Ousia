@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jaysyrk/ousia/internal/gateway"
 	"github.com/jaysyrk/ousia/pkg/config"
@@ -36,7 +37,7 @@ func main() {
 	<-quit
 	log.Println("shutting down gracefully...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {

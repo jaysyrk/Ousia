@@ -24,13 +24,17 @@ func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 		return nil, err
 	}
 
-	balancers, allEndpoints, err := buildBalancers(cfg)
+	balancers, allEndpointsByPool, err := buildBalancers(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	hc := healthcheck.New(allEndpoints, healthcheck.DefaultConfig())
-	hc.Start(context.Background())
+	for _, upCfg := range cfg.Upstreams {
+		endpoints := allEndpointsByPool[upCfg.Name]
+		hcCfg := buildHealthCheckConfig(upCfg.HealthCheck)
+		hc := healthcheck.New(endpoints, hcCfg)
+		hc.Start(context.Background())
+	}
 
 	r := router.New(virtualHosts)
 	h := NewHandler(r, balancers)
@@ -40,8 +44,8 @@ func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 		for _, vh := range cfg.VirtualHosts {
 			if vh.TLS != nil {
 				tlsCfg, err = buildTLSConfig(&types.TLSConfig{
-					CertFile:	vh.TLS.CertFile,
-					KeyFile:	vh.TLS.KeyFile,
+					CertFile: vh.TLS.CertFile,
+					KeyFile:  vh.TLS.KeyFile,
 				})
 				if err != nil {
 					return nil, err
@@ -51,7 +55,7 @@ func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 		}
 	}
 
-	s := NewServer(cfg.Gateway.ListenAddr, cfg.Gateway.TLSAddr, h, tlsCfg)
+	s := NewServer(cfg, r, balancers, h, tlsCfg)
 
 	store := controlplane.NewStore(cfg)
 	watcher := controlplane.NewWatcher(configPath, store, 5*time.Second)
@@ -64,6 +68,30 @@ func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 	go watcher.Start(context.Background())
 
 	return s, nil
+}
+
+func buildHealthCheckConfig(hcCfg config.HealthCheckConfig) healthcheck.Config {
+	cfg := healthcheck.DefaultConfig()
+	if hcCfg.Path != "" {
+		cfg.Path = hcCfg.Path
+	}
+	if hcCfg.Interval != "" {
+		if d, err := time.ParseDuration(hcCfg.Interval); err == nil {
+			cfg.Interval = d
+		}
+	}
+	if hcCfg.Timeout != "" {
+		if d, err := time.ParseDuration(hcCfg.Timeout); err == nil {
+			cfg.Timeout = d
+		}
+	}
+	if hcCfg.FailThreshold > 0 {
+		cfg.FailThreshold = hcCfg.FailThreshold
+	}
+	if hcCfg.SuccessThreshold > 0 {
+		cfg.SuccessThreshold = hcCfg.SuccessThreshold
+	}
+	return cfg
 }
 
 func buildVirtualHosts(cfg *config.OusiaConfig) ([]*types.VirtualHost, error) {
@@ -83,19 +111,22 @@ func buildVirtualHosts(cfg *config.OusiaConfig) ([]*types.VirtualHost, error) {
 
 		for _, rCfg := range vhCfg.Routes {
 			route := &types.Route{
-				ID:		rCfg.ID,
-				Priority:	rCfg.Priority,
+				ID:       rCfg.ID,
+				Priority: rCfg.Priority,
 				Match: types.RouteMatch{
-					PathPrefix:	rCfg.Match.PathPrefix,
-					PathExact:	rCfg.Match.PathExact,
-					Methods:	rCfg.Match.Methods,
-					Headers:	rCfg.Match.Headers,
+					PathPrefix: rCfg.Match.PathPrefix,
+					PathExact:  rCfg.Match.PathExact,
+					Methods:    rCfg.Match.Methods,
+					Headers:    rCfg.Match.Headers,
 				},
 				Action: types.RouteAction{
-					UpstreamPool:	rCfg.Action.Upstream,
-					StripPrefix:	rCfg.Action.StripPrefix,
-					AddHeaders:	rCfg.Action.AddHeaders,
-					RetryCount:	rCfg.Action.RetryCount,
+					UpstreamPool:  rCfg.Action.Upstream,
+					StripPrefix:   rCfg.Action.StripPrefix,
+					AddHeaders:    rCfg.Action.AddHeaders,
+					RemoveHeaders: rCfg.Action.RemoveHeaders,
+					AddRespHeaders:    rCfg.Action.AddRespHeaders,
+					RemoveRespHeaders: rCfg.Action.RemoveRespHeaders,
+					RetryCount:   rCfg.Action.RetryCount,
 				},
 			}
 			vh.Routes = append(vh.Routes, route)
@@ -107,9 +138,9 @@ func buildVirtualHosts(cfg *config.OusiaConfig) ([]*types.VirtualHost, error) {
 	return hosts, nil
 }
 
-func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, []*types.Endpoint, error) {
+func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, map[string][]*types.Endpoint, error) {
 	balancers := make(map[string]balancer.Balancer)
-	var allEndpoints []*types.Endpoint
+	endpointsByPool := make(map[string][]*types.Endpoint)
 
 	for _, upCfg := range cfg.Upstreams {
 		var endpoints []*types.Endpoint
@@ -120,20 +151,21 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, []*t
 				w = 1
 			}
 			ep := &types.Endpoint{
-				ID:		epCfg.ID,
-				Address:	epCfg.Address,
-				Weight:		w,
-				Healthy:	true,
-				Metadata:	epCfg.Meta,
+				ID:       epCfg.ID,
+				Address:  epCfg.Address,
+				Weight:   w,
+				Healthy:  true,
+				Metadata: epCfg.Meta,
 			}
 			endpoints = append(endpoints, ep)
-			allEndpoints = append(allEndpoints, ep)
 		}
 
+		endpointsByPool[upCfg.Name] = endpoints
+
 		pool := &types.UpstreamPool{
-			Name:		upCfg.Name,
-			Endpoints:	endpoints,
-			Algorithm:	types.LBAlgorithm(upCfg.Algorithm),
+			Name:      upCfg.Name,
+			Endpoints: endpoints,
+			Algorithm: types.LBAlgorithm(upCfg.Algorithm),
 		}
 
 		lb, err := balancer.New(pool)
@@ -144,5 +176,5 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, []*t
 		balancers[upCfg.Name] = lb
 	}
 
-	return balancers, allEndpoints, nil
+	return balancers, endpointsByPool, nil
 }

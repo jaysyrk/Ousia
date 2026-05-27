@@ -33,11 +33,14 @@ type RouteMatch struct {
 }
 
 type RouteAction struct {
-	UpstreamPool	string
-	StripPrefix	string
-	AddHeaders	map[string]string
-	Timeout		time.Duration
-	RetryCount	int
+	UpstreamPool      string
+	StripPrefix       string
+	AddHeaders        map[string]string // add/override request headers before forwarding
+	RemoveHeaders     []string          // strip request headers before forwarding
+	AddRespHeaders    map[string]string // add/override response headers before sending to client
+	RemoveRespHeaders []string          // strip response headers before sending to client
+	Timeout           time.Duration
+	RetryCount        int
 }
 
 type Route struct {

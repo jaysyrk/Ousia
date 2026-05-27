@@ -31,19 +31,22 @@ func applyVirtualHosts(r *router.Router, cfg *config.OusiaConfig) {
 
 		for _, rCfg := range vhCfg.Routes {
 			route := &types.Route{
-				ID:		rCfg.ID,
-				Priority:	rCfg.Priority,
+				ID:       rCfg.ID,
+				Priority: rCfg.Priority,
 				Match: types.RouteMatch{
-					PathPrefix:	rCfg.Match.PathPrefix,
-					PathExact:	rCfg.Match.PathExact,
-					Methods:	rCfg.Match.Methods,
-					Headers:	rCfg.Match.Headers,
+					PathPrefix: rCfg.Match.PathPrefix,
+					PathExact:  rCfg.Match.PathExact,
+					Methods:    rCfg.Match.Methods,
+					Headers:    rCfg.Match.Headers,
 				},
 				Action: types.RouteAction{
-					UpstreamPool:	rCfg.Action.Upstream,
-					StripPrefix:	rCfg.Action.StripPrefix,
-					AddHeaders:	rCfg.Action.AddHeaders,
-					RetryCount:	rCfg.Action.RetryCount,
+					UpstreamPool:      rCfg.Action.Upstream,
+					StripPrefix:       rCfg.Action.StripPrefix,
+					AddHeaders:        rCfg.Action.AddHeaders,
+					RemoveHeaders:     rCfg.Action.RemoveHeaders,
+					AddRespHeaders:    rCfg.Action.AddRespHeaders,
+					RemoveRespHeaders: rCfg.Action.RemoveRespHeaders,
+					RetryCount:        rCfg.Action.RetryCount,
 				},
 			}
 			vh.Routes = append(vh.Routes, route)

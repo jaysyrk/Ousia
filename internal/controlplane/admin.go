@@ -425,20 +425,23 @@ func cloneConfig(cfg *config.OusiaConfig) *config.OusiaConfig {
 		}
 		for _, route := range vh.Routes {
 			newVh.Routes = append(newVh.Routes, config.RouteConfig{
-				ID:		route.ID,
-				Priority:	route.Priority,
+				ID:       route.ID,
+				Priority: route.Priority,
 				Match: config.MatchConfig{
-					PathPrefix:	route.Match.PathPrefix,
-					PathExact:	route.Match.PathExact,
-					Methods:	append([]string(nil), route.Match.Methods...),
-					Headers:	copyStringMap(route.Match.Headers),
+					PathPrefix: route.Match.PathPrefix,
+					PathExact:  route.Match.PathExact,
+					Methods:    append([]string(nil), route.Match.Methods...),
+					Headers:    copyStringMap(route.Match.Headers),
 				},
 				Action: config.ActionConfig{
-					Upstream:	route.Action.Upstream,
-					StripPrefix:	route.Action.StripPrefix,
-					AddHeaders:	copyStringMap(route.Action.AddHeaders),
-					Timeout:	route.Action.Timeout,
-					RetryCount:	route.Action.RetryCount,
+					Upstream:          route.Action.Upstream,
+					StripPrefix:       route.Action.StripPrefix,
+					AddHeaders:        copyStringMap(route.Action.AddHeaders),
+					RemoveHeaders:     append([]string(nil), route.Action.RemoveHeaders...),
+					AddRespHeaders:    copyStringMap(route.Action.AddRespHeaders),
+					RemoveRespHeaders: append([]string(nil), route.Action.RemoveRespHeaders...),
+					Timeout:           route.Action.Timeout,
+					RetryCount:        route.Action.RetryCount,
 				},
 			})
 		}
@@ -510,20 +513,23 @@ func addOrUpdateRouteInConfig(cfg *config.OusiaConfig, route *types.Route, virtu
 			continue
 		}
 		vh.Routes = append(vh.Routes, config.RouteConfig{
-			ID:		route.ID,
-			Priority:	route.Priority,
+			ID:       route.ID,
+			Priority: route.Priority,
 			Match: config.MatchConfig{
-				PathPrefix:	route.Match.PathPrefix,
-				PathExact:	route.Match.PathExact,
-				Methods:	append([]string(nil), route.Match.Methods...),
-				Headers:	copyStringMap(route.Match.Headers),
+				PathPrefix: route.Match.PathPrefix,
+				PathExact:  route.Match.PathExact,
+				Methods:    append([]string(nil), route.Match.Methods...),
+				Headers:    copyStringMap(route.Match.Headers),
 			},
 			Action: config.ActionConfig{
-				Upstream:	route.Action.UpstreamPool,
-				StripPrefix:	route.Action.StripPrefix,
-				AddHeaders:	copyStringMap(route.Action.AddHeaders),
-				Timeout:	route.Action.Timeout.String(),
-				RetryCount:	route.Action.RetryCount,
+				Upstream:          route.Action.UpstreamPool,
+				StripPrefix:       route.Action.StripPrefix,
+				AddHeaders:        copyStringMap(route.Action.AddHeaders),
+				RemoveHeaders:     append([]string(nil), route.Action.RemoveHeaders...),
+				AddRespHeaders:    copyStringMap(route.Action.AddRespHeaders),
+				RemoveRespHeaders: append([]string(nil), route.Action.RemoveRespHeaders...),
+				Timeout:           route.Action.Timeout.String(),
+				RetryCount:        route.Action.RetryCount,
 			},
 		})
 		sort.Slice(vh.Routes, func(i, j int) bool {
@@ -534,22 +540,25 @@ func addOrUpdateRouteInConfig(cfg *config.OusiaConfig, route *types.Route, virtu
 	}
 
 	newVh := config.VirtualHostConfig{
-		Hostname:	virtualHost,
+		Hostname: virtualHost,
 		Routes: []config.RouteConfig{{
-			ID:		route.ID,
-			Priority:	route.Priority,
+			ID:       route.ID,
+			Priority: route.Priority,
 			Match: config.MatchConfig{
-				PathPrefix:	route.Match.PathPrefix,
-				PathExact:	route.Match.PathExact,
-				Methods:	append([]string(nil), route.Match.Methods...),
-				Headers:	copyStringMap(route.Match.Headers),
+				PathPrefix: route.Match.PathPrefix,
+				PathExact:  route.Match.PathExact,
+				Methods:    append([]string(nil), route.Match.Methods...),
+				Headers:    copyStringMap(route.Match.Headers),
 			},
 			Action: config.ActionConfig{
-				Upstream:	route.Action.UpstreamPool,
-				StripPrefix:	route.Action.StripPrefix,
-				AddHeaders:	copyStringMap(route.Action.AddHeaders),
-				Timeout:	route.Action.Timeout.String(),
-				RetryCount:	route.Action.RetryCount,
+				Upstream:          route.Action.UpstreamPool,
+				StripPrefix:       route.Action.StripPrefix,
+				AddHeaders:        copyStringMap(route.Action.AddHeaders),
+				RemoveHeaders:     append([]string(nil), route.Action.RemoveHeaders...),
+				AddRespHeaders:    copyStringMap(route.Action.AddRespHeaders),
+				RemoveRespHeaders: append([]string(nil), route.Action.RemoveRespHeaders...),
+				Timeout:           route.Action.Timeout.String(),
+				RetryCount:        route.Action.RetryCount,
 			},
 		}},
 	}

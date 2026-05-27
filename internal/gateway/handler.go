@@ -13,14 +13,14 @@ import (
 )
 
 type Handler struct {
-	router		*router.Router
-	balancers	map[string]balancer.Balancer
+	router    *router.Router
+	balancers map[string]balancer.Balancer
 }
 
 func NewHandler(r *router.Router, balancers map[string]balancer.Balancer) *Handler {
 	return &Handler{
-		router:		r,
-		balancers:	balancers,
+		router:    r,
+		balancers: balancers,
 	}
 }
 
@@ -46,18 +46,54 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	for key, val := range route.Action.AddHeaders {
 		req.Header.Set(key, val)
 	}
+	for _, key := range route.Action.RemoveHeaders {
+		req.Header.Del(key)
+	}
+
+	rw := &respHeaderWriter{
+		ResponseWriter: w,
+		addHeaders:     route.Action.AddRespHeaders,
+		removeHeaders:  route.Action.RemoveRespHeaders,
+	}
 
 	wrapped := observability.Middleware(route.Action.UpstreamPool, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		forward(w, req, endpoint, route)
 	}))
 
-	wrapped.ServeHTTP(w, req)
+	wrapped.ServeHTTP(rw, req)
+}
+
+type respHeaderWriter struct {
+	http.ResponseWriter
+	addHeaders     map[string]string
+	removeHeaders  []string
+	headersMutated bool
+}
+
+func (rw *respHeaderWriter) WriteHeader(code int) {
+	if !rw.headersMutated {
+		rw.headersMutated = true
+		for key, val := range rw.addHeaders {
+			rw.ResponseWriter.Header().Set(key, val)
+		}
+		for _, key := range rw.removeHeaders {
+			rw.ResponseWriter.Header().Del(key)
+		}
+	}
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *respHeaderWriter) Write(b []byte) (int, error) {
+	if !rw.headersMutated {
+		rw.WriteHeader(http.StatusOK)
+	}
+	return rw.ResponseWriter.Write(b)
 }
 
 func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route *types.Route) {
 	target := &url.URL{
-		Scheme:	"http",
-		Host:	ep.Address,
+		Scheme: "http",
+		Host:   ep.Address,
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)

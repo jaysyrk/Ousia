@@ -4,60 +4,42 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
-const shardCount = 256
-
-type shard struct {
-	clients sync.Map
-}
-
 type rateLimiter struct {
-	shards     [shardCount]*shard
-	rate       int64
-	burst      int64
-	interval   time.Duration
-	bucketPool sync.Pool
+	mu       sync.Mutex
+	clients  map[string]*bucket
+	rate     int
+	burst    int
+	interval time.Duration
+	keyFn    func(*http.Request) string
 }
 
 type bucket struct {
-	tokens   int64
-	lastSeen int64
-}
-
-func hashIP(ip string) uint32 {
-	var hash uint32 = 2166136261
-	for i := 0; i < len(ip); i++ {
-		hash ^= uint32(ip[i])
-		hash *= 16777619
-	}
-	return hash % shardCount
+	tokens   int
+	lastSeen time.Time
 }
 
 func RateLimit(requestsPerSecond int, burst int) Middleware {
-	rl := &rateLimiter{
-		rate:     int64(requestsPerSecond),
-		burst:    int64(burst),
-		interval: time.Second,
-		bucketPool: sync.Pool{
-			New: func() interface{} {
-				return &bucket{}
-			},
-		},
-	}
+	return RateLimitWithKey(requestsPerSecond, burst, ExtractIP)
+}
 
-	for i := 0; i < shardCount; i++ {
-		rl.shards[i] = &shard{}
+func RateLimitWithKey(requestsPerSecond int, burst int, keyFn func(*http.Request) string) Middleware {
+	rl := &rateLimiter{
+		clients:  make(map[string]*bucket),
+		rate:     requestsPerSecond,
+		burst:    burst,
+		interval: time.Second,
+		keyFn:    keyFn,
 	}
 
 	go rl.cleanup()
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := extractIP(r)
-			if !rl.allow(ip) {
+			key := rl.keyFn(r)
+			if !rl.allow(key) {
 				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}
@@ -66,72 +48,56 @@ func RateLimit(requestsPerSecond int, burst int) Middleware {
 	}
 }
 
-func (rl *rateLimiter) allow(ip string) bool {
-	idx := hashIP(ip)
-	s := rl.shards[idx]
+func HeaderKeyFunc(header string) func(*http.Request) string {
+	return func(r *http.Request) string {
+		if val := r.Header.Get(header); val != "" {
+			return val
+		}
+		return ExtractIP(r)
+	}
+}
 
-	now := time.Now().UnixNano()
+func (rl *rateLimiter) allow(key string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
 
-	val, loaded := s.clients.Load(ip)
-	if !loaded {
-		b := rl.bucketPool.Get().(*bucket)
-		atomic.StoreInt64(&b.tokens, rl.burst-1)
-		atomic.StoreInt64(&b.lastSeen, now)
-
-		s.clients.Store(ip, b)
+	b, ok := rl.clients[key]
+	if !ok {
+		rl.clients[key] = &bucket{tokens: rl.burst - 1, lastSeen: time.Now()}
 		return true
 	}
 
-	b := val.(*bucket)
-	lastSeen := atomic.LoadInt64(&b.lastSeen)
-	elapsed := time.Duration(now - lastSeen)
+	elapsed := time.Since(b.lastSeen)
+	refill := int(elapsed/rl.interval) * rl.rate
+	b.tokens += refill
+	if b.tokens > rl.burst {
+		b.tokens = rl.burst
+	}
+	b.lastSeen = time.Now()
 
-	refill := int64(elapsed/rl.interval) * rl.rate
-	if refill > 0 {
-		if atomic.CompareAndSwapInt64(&b.lastSeen, lastSeen, now) {
-			atomic.AddInt64(&b.tokens, refill)
-
-			// Cap the tokens at the max burst
-			currentTokens := atomic.LoadInt64(&b.tokens)
-			if currentTokens > rl.burst {
-				atomic.StoreInt64(&b.tokens, rl.burst)
-			}
-		}
+	if b.tokens <= 0 {
+		return false
 	}
 
-	// Lock-free decrement using CAS loop
-	for {
-		currentTokens := atomic.LoadInt64(&b.tokens)
-		if currentTokens <= 0 {
-			return false
-		}
-		if atomic.CompareAndSwapInt64(&b.tokens, currentTokens, currentTokens-1) {
-			return true
-		}
-	}
+	b.tokens--
+	return true
 }
 
 func (rl *rateLimiter) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for range ticker.C {
-		now := time.Now().UnixNano()
-		for i := 0; i < shardCount; i++ {
-			s := rl.shards[i]
-			s.clients.Range(func(key, value interface{}) bool {
-				b := value.(*bucket)
-				lastSeen := atomic.LoadInt64(&b.lastSeen)
-				if time.Duration(now-lastSeen) > 10*time.Minute {
-					s.clients.Delete(key)
-					rl.bucketPool.Put(b)
-				}
-				return true
-			})
+		rl.mu.Lock()
+		for key, b := range rl.clients {
+			if time.Since(b.lastSeen) > 10*time.Minute {
+				delete(rl.clients, key)
+			}
 		}
+		rl.mu.Unlock()
 	}
 }
 
-func extractIP(r *http.Request) string {
+func ExtractIP(r *http.Request) string {
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 		return strings.Split(fwd, ",")[0]
 	}
