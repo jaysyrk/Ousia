@@ -20,6 +20,7 @@ COPY --from=builder /bin/ousiactl /usr/local/bin/ousiactl
 
 COPY certs /app/certs
 COPY ousia.yaml /app/ousia.yaml
+COPY plugin.wasm /app/plugin.wasm
 
 EXPOSE 8080 8443 9000
 

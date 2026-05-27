@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
 type WasmMiddleware struct {
@@ -16,6 +17,8 @@ type WasmMiddleware struct {
 
 func NewWasmMiddleware(ctx context.Context, wasmPath string, next http.Handler) (*WasmMiddleware, error) {
 	r := wazero.NewRuntime(ctx)
+
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	wasmBytes, err := os.ReadFile(wasmPath)
 	if err != nil {
@@ -37,7 +40,7 @@ func NewWasmMiddleware(ctx context.Context, wasmPath string, next http.Handler) 
 func (m *WasmMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	mod, err := m.runtime.InstantiateModule(ctx, m.module, wazero.NewModuleConfig().WithName("plugin"))
+	mod, err := m.runtime.InstantiateModule(ctx, m.module, wazero.NewModuleConfig().WithName("plugin").WithStdout(os.Stdout))
 	if err == nil {
 		fn := mod.ExportedFunction("process_request")
 		if fn != nil {
