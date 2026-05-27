@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import Topology from './components/Topology'
+import Metrics from './components/Metrics'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeTab, setActiveTab] = useState('topology')
 
   return (
     <div className="container fade-in">
@@ -10,32 +12,35 @@ function App() {
         Welcome to the next-generation service mesh dashboard.
       </p>
 
-      <div className="grid">
-        <div className="glass-panel">
-          <h3>Metrics</h3>
-          <p>Real-time telemetry and performance statistics.</p>
-          <div style={{ marginTop: '1rem' }}>
-            <button className="btn-primary" onClick={() => setCount(count + 1)}>
-              Ping Count: {count}
-            </button>
-          </div>
-        </div>
+      <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem' }}>
+        <button 
+          className="btn-primary" 
+          onClick={() => setActiveTab('topology')}
+          style={{ opacity: activeTab === 'topology' ? 1 : 0.6 }}
+        >
+          Network Topology
+        </button>
+        <button 
+          className="btn-primary" 
+          onClick={() => setActiveTab('metrics')}
+          style={{ opacity: activeTab === 'metrics' ? 1 : 0.6 }}
+        >
+          Live Metrics
+        </button>
+      </div>
 
-        <div className="glass-panel">
-          <h3>Topology</h3>
-          <p>Service graph and network map.</p>
-          <div style={{ marginTop: '1rem', color: 'var(--accent-teal)' }}>
-            Status: Online
+      <div className="glass-panel" style={{ minHeight: '400px' }}>
+        {activeTab === 'topology' ? (
+          <div>
+            <h3 style={{ marginBottom: '1rem' }}>Topology</h3>
+            <Topology />
           </div>
-        </div>
-
-        <div className="glass-panel pulse" style={{ animationDuration: '3s' }}>
-          <h3>System Health</h3>
-          <p>All services are operating normally.</p>
-          <div style={{ marginTop: '1rem', color: 'var(--success)' }}>
-            100% Uptime
+        ) : (
+          <div>
+            <h3 style={{ marginBottom: '1rem' }}>System Metrics</h3>
+            <Metrics />
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
