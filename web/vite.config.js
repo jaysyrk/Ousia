@@ -9,7 +9,7 @@ export default defineConfig({
       '/api/admin': {
         target: 'http://127.0.0.1:9000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/admin/, '')
+        rewrite: (path) => path.replace(/^\/api\/admin/, '/api')
       },
       '/api/prometheus': {
         target: 'http://127.0.0.1:9090',
