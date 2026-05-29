@@ -10,6 +10,7 @@ var ErrNoHealthyEndpoints = errors.New("balancer: no healthy endpoints available
 
 type Balancer interface {
 	Next(key string) (*types.Endpoint, error)
+	Done(id string)
 	Add(ep *types.Endpoint)
 	Remove(id string)
 }

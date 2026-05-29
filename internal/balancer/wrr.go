@@ -64,3 +64,5 @@ func (w *WRR) Endpoints() []*types.Endpoint {
 	defer w.mu.RUnlock()
 	return w.entries
 }
+
+func (w *WRR) Done(id string) {}

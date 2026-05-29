@@ -53,3 +53,6 @@ func (rr *RoundRobin) Endpoints() []*types.Endpoint {
 	defer rr.mu.RUnlock()
 	return rr.endpoints
 }
+
+func (rr *RoundRobin) Done(id string) {}
+
