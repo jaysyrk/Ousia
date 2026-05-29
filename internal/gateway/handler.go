@@ -2,12 +2,16 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/jaysyrk/ousia/internal/balancer"
+	"github.com/jaysyrk/ousia/internal/middleware"
 	"github.com/jaysyrk/ousia/internal/observability"
 	"github.com/jaysyrk/ousia/internal/router"
 	"github.com/jaysyrk/ousia/pkg/types"
@@ -16,13 +20,37 @@ import (
 type Handler struct {
 	router    *router.Router
 	balancers map[string]balancer.Balancer
+	cbMu      sync.RWMutex
+	cbs       map[string]*middleware.CircuitBreaker
 }
 
 func NewHandler(r *router.Router, balancers map[string]balancer.Balancer) *Handler {
 	return &Handler{
 		router:    r,
 		balancers: balancers,
+		cbs:       make(map[string]*middleware.CircuitBreaker),
 	}
+}
+
+func (h *Handler) getCircuitBreaker(ep *types.Endpoint) *middleware.CircuitBreaker {
+	h.cbMu.RLock()
+	cb, ok := h.cbs[ep.ID]
+	h.cbMu.RUnlock()
+
+	if ok {
+		return cb
+	}
+
+	h.cbMu.Lock()
+	defer h.cbMu.Unlock()
+
+	if cb, ok := h.cbs[ep.ID]; ok {
+		return cb
+	}
+
+	cb = middleware.NewCircuitBreaker(3, 5*time.Second)
+	h.cbs[ep.ID] = cb
+	return cb
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -43,6 +71,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "no healthy upstream", http.StatusServiceUnavailable)
 		return
 	}
+	defer lb.Done(endpoint.ID)
 
 	for key, val := range route.Action.AddHeaders {
 		req.Header.Set(key, val)
@@ -57,8 +86,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		removeHeaders:  route.Action.RemoveRespHeaders,
 	}
 
+	cb := h.getCircuitBreaker(endpoint)
+
 	wrapped := observability.Middleware(route.Action.UpstreamPool, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		forward(w, req, endpoint, route)
+		forward(w, req, endpoint, route, cb)
 	}))
 
 	wrapped.ServeHTTP(rw, req)
@@ -91,7 +122,57 @@ func (rw *respHeaderWriter) Write(b []byte) (int, error) {
 	return rw.ResponseWriter.Write(b)
 }
 
-func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route *types.Route) {
+type resiliencyTransport struct {
+	base  http.RoundTripper
+	route *types.Route
+	cb    *middleware.CircuitBreaker
+}
+
+func (t *resiliencyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+
+	retryCfg := middleware.DefaultRetryConfig()
+	if t.route.Action.RetryCount > 0 {
+		retryCfg.MaxAttempts = t.route.Action.RetryCount + 1
+	}
+
+	err := middleware.WithRetry(retryCfg, func() error {
+		if t.cb != nil {
+			if err := t.cb.Allow(); err != nil {
+				return err
+			}
+		}
+
+		var err error
+		resp, err = t.base.RoundTrip(req)
+
+		if err != nil {
+			if t.cb != nil {
+				t.cb.Failure()
+			}
+			return err
+		}
+
+		if resp.StatusCode >= 500 {
+			if t.cb != nil {
+				t.cb.Failure()
+			}
+			return fmt.Errorf("upstream returned %d", resp.StatusCode)
+		}
+
+		if t.cb != nil {
+			t.cb.Success()
+		}
+		return nil
+	})
+
+	if err != nil && resp == nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route *types.Route, cb *middleware.CircuitBreaker) {
 	if route.Action.Timeout > 0 {
 		ctx, cancel := context.WithTimeout(req.Context(), route.Action.Timeout)
 		defer cancel()
@@ -104,6 +185,11 @@ func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.Transport = &resiliencyTransport{
+		base:  http.DefaultTransport,
+		route: route,
+		cb:    cb,
+	}
 
 	proxy.Director = func(r *http.Request) {
 		r.URL.Scheme = target.Scheme
