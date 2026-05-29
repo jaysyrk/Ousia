@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jaysyrk/ousia/internal/balancer"
@@ -17,18 +18,18 @@ import (
 )
 
 type AdminAPI struct {
-	router		*router.Router
-	balancers	map[string]balancer.Balancer
-	store		*Store
-	mesh		*MeshRegistry
+	router    *router.Router
+	balancers map[string]balancer.Balancer
+	store     *Store
+	mesh      *MeshRegistry
 }
 
 func NewAdminAPI(r *router.Router, balancers map[string]balancer.Balancer, store *Store, mesh *MeshRegistry) *AdminAPI {
 	return &AdminAPI{
-		router:		r,
-		balancers:	balancers,
-		store:		store,
-		mesh:		mesh,
+		router:    r,
+		balancers: balancers,
+		store:     store,
+		mesh:      mesh,
 	}
 }
 
@@ -108,32 +109,32 @@ func (a *AdminAPI) handleUpstreamEndpoints(w http.ResponseWriter, r *http.Reques
 func (a *AdminAPI) listRoutes(w http.ResponseWriter, r *http.Request) {
 	cfg := a.store.Get()
 	type routeResponse struct {
-		ID		string			`json:"id"`
-		VirtualHost	string			`json:"virtual_host"`
-		Priority	int			`json:"priority"`
-		PathPrefix	string			`json:"path_prefix,omitempty"`
-		PathExact	string			`json:"path_exact,omitempty"`
-		Methods		[]string		`json:"methods,omitempty"`
-		Headers		map[string]string	`json:"headers,omitempty"`
-		Upstream	string			`json:"upstream"`
-		Timeout		string			`json:"timeout,omitempty"`
-		RetryCount	int			`json:"retry_count,omitempty"`
+		ID          string            `json:"id"`
+		VirtualHost string            `json:"virtual_host"`
+		Priority    int               `json:"priority"`
+		PathPrefix  string            `json:"path_prefix,omitempty"`
+		PathExact   string            `json:"path_exact,omitempty"`
+		Methods     []string          `json:"methods,omitempty"`
+		Headers     map[string]string `json:"headers,omitempty"`
+		Upstream    string            `json:"upstream"`
+		Timeout     string            `json:"timeout,omitempty"`
+		RetryCount  int               `json:"retry_count,omitempty"`
 	}
 
 	var routes []routeResponse
 	for _, vh := range cfg.VirtualHosts {
 		for _, route := range vh.Routes {
 			routes = append(routes, routeResponse{
-				ID:		route.ID,
-				VirtualHost:	vh.Hostname,
-				Priority:	route.Priority,
-				PathPrefix:	route.Match.PathPrefix,
-				PathExact:	route.Match.PathExact,
-				Methods:	route.Match.Methods,
-				Headers:	route.Match.Headers,
-				Upstream:	route.Action.Upstream,
-				Timeout:	route.Action.Timeout,
-				RetryCount:	route.Action.RetryCount,
+				ID:          route.ID,
+				VirtualHost: vh.Hostname,
+				Priority:    route.Priority,
+				PathPrefix:  route.Match.PathPrefix,
+				PathExact:   route.Match.PathExact,
+				Methods:     route.Match.Methods,
+				Headers:     route.Match.Headers,
+				Upstream:    route.Action.Upstream,
+				Timeout:     route.Action.Timeout,
+				RetryCount:  route.Action.RetryCount,
 			})
 		}
 	}
@@ -150,32 +151,34 @@ func (a *AdminAPI) getRoute(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	vh := cfg.VirtualHosts[vhIndex]
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id":		route.ID,
-		"virtual_host":	vh.Hostname,
-		"priority":	route.Priority,
-		"path_prefix":	route.Match.PathPrefix,
-		"path_exact":	route.Match.PathExact,
-		"methods":	route.Match.Methods,
-		"headers":	route.Match.Headers,
-		"upstream":	route.Action.Upstream,
-		"timeout":	route.Action.Timeout,
-		"retry_count":	route.Action.RetryCount,
+		"id":           route.ID,
+		"virtual_host": vh.Hostname,
+		"priority":     route.Priority,
+		"path_prefix":  route.Match.PathPrefix,
+		"path_exact":   route.Match.PathExact,
+		"methods":      route.Match.Methods,
+		"headers":      route.Match.Headers,
+		"upstream":     route.Action.Upstream,
+		"timeout":      route.Action.Timeout,
+		"retry_count":  route.Action.RetryCount,
 	})
 }
 
 func (a *AdminAPI) addRoute(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		VirtualHost	string			`json:"virtual_host"`
-		ID		string			`json:"id"`
-		Priority	int			`json:"priority"`
-		PathPrefix	string			`json:"path_prefix"`
-		PathExact	string			`json:"path_exact"`
-		Methods		[]string		`json:"methods"`
-		Headers		map[string]string	`json:"headers"`
-		Upstream	string			`json:"upstream"`
-		Timeout		string			`json:"timeout"`
-		RetryCount	int			`json:"retry_count"`
+		VirtualHost string            `json:"virtual_host"`
+		ID          string            `json:"id"`
+		Priority    int               `json:"priority"`
+		PathPrefix  string            `json:"path_prefix"`
+		PathExact   string            `json:"path_exact"`
+		Methods     []string          `json:"methods"`
+		Headers     map[string]string `json:"headers"`
+		Upstream    string            `json:"upstream"`
+		Timeout     string            `json:"timeout"`
+		RetryCount  int               `json:"retry_count"`
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
@@ -193,18 +196,18 @@ func (a *AdminAPI) addRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	route := &types.Route{
-		ID:		body.ID,
-		Priority:	body.Priority,
+		ID:       body.ID,
+		Priority: body.Priority,
 		Match: types.RouteMatch{
-			PathPrefix:	body.PathPrefix,
-			PathExact:	body.PathExact,
-			Methods:	body.Methods,
-			Headers:	body.Headers,
+			PathPrefix: body.PathPrefix,
+			PathExact:  body.PathExact,
+			Methods:    body.Methods,
+			Headers:    body.Headers,
 		},
 		Action: types.RouteAction{
-			UpstreamPool:	body.Upstream,
-			Timeout:	timeout,
-			RetryCount:	body.RetryCount,
+			UpstreamPool: body.Upstream,
+			Timeout:      timeout,
+			RetryCount:   body.RetryCount,
 		},
 	}
 
@@ -218,17 +221,18 @@ func (a *AdminAPI) addRoute(w http.ResponseWriter, r *http.Request) {
 
 func (a *AdminAPI) updateRoute(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
-		VirtualHost	string			`json:"virtual_host"`
-		Priority	int			`json:"priority"`
-		PathPrefix	string			`json:"path_prefix"`
-		PathExact	string			`json:"path_exact"`
-		Methods		[]string		`json:"methods"`
-		Headers		map[string]string	`json:"headers"`
-		Upstream	string			`json:"upstream"`
-		Timeout		string			`json:"timeout"`
-		RetryCount	int			`json:"retry_count"`
+		VirtualHost string            `json:"virtual_host"`
+		Priority    int               `json:"priority"`
+		PathPrefix  string            `json:"path_prefix"`
+		PathExact   string            `json:"path_exact"`
+		Methods     []string          `json:"methods"`
+		Headers     map[string]string `json:"headers"`
+		Upstream    string            `json:"upstream"`
+		Timeout     string            `json:"timeout"`
+		RetryCount  int               `json:"retry_count"`
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
@@ -245,18 +249,18 @@ func (a *AdminAPI) updateRoute(w http.ResponseWriter, r *http.Request, id string
 	}
 
 	route := &types.Route{
-		ID:		id,
-		Priority:	body.Priority,
+		ID:       id,
+		Priority: body.Priority,
 		Match: types.RouteMatch{
-			PathPrefix:	body.PathPrefix,
-			PathExact:	body.PathExact,
-			Methods:	body.Methods,
-			Headers:	body.Headers,
+			PathPrefix: body.PathPrefix,
+			PathExact:  body.PathExact,
+			Methods:    body.Methods,
+			Headers:    body.Headers,
 		},
 		Action: types.RouteAction{
-			UpstreamPool:	body.Upstream,
-			Timeout:	timeout,
-			RetryCount:	body.RetryCount,
+			UpstreamPool: body.Upstream,
+			Timeout:      timeout,
+			RetryCount:   body.RetryCount,
 		},
 	}
 
@@ -282,14 +286,14 @@ func (a *AdminAPI) deleteRoute(w http.ResponseWriter, r *http.Request, id string
 
 func (a *AdminAPI) listUpstreams(w http.ResponseWriter, r *http.Request) {
 	type endpointResponse struct {
-		ID	string	`json:"id"`
-		Address	string	`json:"address"`
-		Weight	int	`json:"weight"`
-		Healthy	bool	`json:"healthy"`
+		ID      string `json:"id"`
+		Address string `json:"address"`
+		Weight  int    `json:"weight"`
+		Healthy bool   `json:"healthy"`
 	}
 	type upstreamResponse struct {
-		Name		string			`json:"name"`
-		Endpoints	[]endpointResponse	`json:"endpoints"`
+		Name      string             `json:"name"`
+		Endpoints []endpointResponse `json:"endpoints"`
 	}
 
 	var upstreams []upstreamResponse
@@ -305,17 +309,17 @@ func (a *AdminAPI) listUpstreams(w http.ResponseWriter, r *http.Request) {
 		if inspector, ok := lb.(interface{ Endpoints() []*types.Endpoint }); ok {
 			for _, ep := range inspector.Endpoints() {
 				endpoints = append(endpoints, endpointResponse{
-					ID:		ep.ID,
-					Address:	ep.Address,
-					Weight:		ep.Weight,
-					Healthy:	ep.Healthy,
+					ID:      ep.ID,
+					Address: ep.Address,
+					Weight:  ep.Weight,
+					Healthy: ep.Healthy,
 				})
 			}
 		}
 
 		upstreams = append(upstreams, upstreamResponse{
-			Name:		up.Name,
-			Endpoints:	endpoints,
+			Name:      up.Name,
+			Endpoints: endpoints,
 		})
 	}
 
@@ -324,11 +328,12 @@ func (a *AdminAPI) listUpstreams(w http.ResponseWriter, r *http.Request) {
 
 func (a *AdminAPI) addEndpoint(w http.ResponseWriter, r *http.Request, poolName string) {
 	var body struct {
-		ID	string	`json:"id"`
-		Address	string	`json:"address"`
-		Weight	int	`json:"weight"`
+		ID      string `json:"id"`
+		Address string `json:"address"`
+		Weight  int    `json:"weight"`
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
@@ -345,10 +350,10 @@ func (a *AdminAPI) addEndpoint(w http.ResponseWriter, r *http.Request, poolName 
 	}
 
 	endpoint := &types.Endpoint{
-		ID:		body.ID,
-		Address:	body.Address,
-		Weight:		defaultWeight(body.Weight),
-		Healthy:	true,
+		ID:      body.ID,
+		Address: body.Address,
+		Weight:  defaultWeight(body.Weight),
+		Healthy: true,
 	}
 
 	cfg := cloneConfig(a.store.Get())
@@ -387,10 +392,10 @@ func (a *AdminAPI) handleHealth(w http.ResponseWriter, r *http.Request) {
 		routeCount += len(vh.Routes)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":		"ok",
-		"virtual_hosts":	len(cfg.VirtualHosts),
-		"routes":		routeCount,
-		"upstreams":		len(cfg.Upstreams),
+		"status":        "ok",
+		"virtual_hosts": len(cfg.VirtualHosts),
+		"routes":        routeCount,
+		"upstreams":     len(cfg.Upstreams),
 	})
 }
 
@@ -420,8 +425,8 @@ func cloneConfig(cfg *config.OusiaConfig) *config.OusiaConfig {
 	}
 	for _, vh := range cfg.VirtualHosts {
 		newVh := config.VirtualHostConfig{
-			Hostname:	vh.Hostname,
-			TLS:		vh.TLS,
+			Hostname: vh.Hostname,
+			TLS:      vh.TLS,
 		}
 		for _, route := range vh.Routes {
 			newVh.Routes = append(newVh.Routes, config.RouteConfig{
@@ -449,15 +454,15 @@ func cloneConfig(cfg *config.OusiaConfig) *config.OusiaConfig {
 	}
 	for _, up := range cfg.Upstreams {
 		newUp := config.UpstreamConfig{
-			Name:		up.Name,
-			Algorithm:	up.Algorithm,
+			Name:      up.Name,
+			Algorithm: up.Algorithm,
 		}
 		for _, ep := range up.Endpoints {
 			newUp.Endpoints = append(newUp.Endpoints, config.EndpointConfig{
-				ID:		ep.ID,
-				Address:	ep.Address,
-				Weight:		ep.Weight,
-				Meta:		copyStringMap(ep.Meta),
+				ID:      ep.ID,
+				Address: ep.Address,
+				Weight:  ep.Weight,
+				Meta:    copyStringMap(ep.Meta),
 			})
 		}
 		clone.Upstreams = append(clone.Upstreams, newUp)
@@ -577,10 +582,10 @@ func updateUpstreamEndpointsInConfig(cfg *config.OusiaConfig, poolName string, e
 				}
 			}
 			up.Endpoints = append(up.Endpoints, config.EndpointConfig{
-				ID:		endpoint.ID,
-				Address:	endpoint.Address,
-				Weight:		endpoint.Weight,
-				Meta:		copyStringMap(endpoint.Metadata),
+				ID:      endpoint.ID,
+				Address: endpoint.Address,
+				Weight:  endpoint.Weight,
+				Meta:    copyStringMap(endpoint.Metadata),
 			})
 			cfg.Upstreams[ui] = up
 			return nil
@@ -607,20 +612,20 @@ func applyRouteToRouter(r *router.Router, cfg *config.OusiaConfig, route *types.
 		}
 		for _, rCfg := range vhCfg.Routes {
 			vh.Routes = append(vh.Routes, &types.Route{
-				ID:		rCfg.ID,
-				Priority:	rCfg.Priority,
+				ID:       rCfg.ID,
+				Priority: rCfg.Priority,
 				Match: types.RouteMatch{
-					PathPrefix:	rCfg.Match.PathPrefix,
-					PathExact:	rCfg.Match.PathExact,
-					Methods:	append([]string(nil), rCfg.Match.Methods...),
-					Headers:	copyStringMap(rCfg.Match.Headers),
+					PathPrefix: rCfg.Match.PathPrefix,
+					PathExact:  rCfg.Match.PathExact,
+					Methods:    append([]string(nil), rCfg.Match.Methods...),
+					Headers:    copyStringMap(rCfg.Match.Headers),
 				},
 				Action: types.RouteAction{
-					UpstreamPool:	rCfg.Action.Upstream,
-					StripPrefix:	rCfg.Action.StripPrefix,
-					AddHeaders:	copyStringMap(rCfg.Action.AddHeaders),
-					Timeout:	parseDurationOrZero(rCfg.Action.Timeout),
-					RetryCount:	rCfg.Action.RetryCount,
+					UpstreamPool: rCfg.Action.Upstream,
+					StripPrefix:  rCfg.Action.StripPrefix,
+					AddHeaders:   copyStringMap(rCfg.Action.AddHeaders),
+					Timeout:      parseDurationOrZero(rCfg.Action.Timeout),
+					RetryCount:   rCfg.Action.RetryCount,
 				},
 			})
 		}
@@ -636,20 +641,20 @@ func rebuildRouterForConfig(r *router.Router, cfg *config.OusiaConfig) {
 		}
 		for _, rCfg := range vhCfg.Routes {
 			vh.Routes = append(vh.Routes, &types.Route{
-				ID:		rCfg.ID,
-				Priority:	rCfg.Priority,
+				ID:       rCfg.ID,
+				Priority: rCfg.Priority,
 				Match: types.RouteMatch{
-					PathPrefix:	rCfg.Match.PathPrefix,
-					PathExact:	rCfg.Match.PathExact,
-					Methods:	append([]string(nil), rCfg.Match.Methods...),
-					Headers:	copyStringMap(rCfg.Match.Headers),
+					PathPrefix: rCfg.Match.PathPrefix,
+					PathExact:  rCfg.Match.PathExact,
+					Methods:    append([]string(nil), rCfg.Match.Methods...),
+					Headers:    copyStringMap(rCfg.Match.Headers),
 				},
 				Action: types.RouteAction{
-					UpstreamPool:	rCfg.Action.Upstream,
-					StripPrefix:	rCfg.Action.StripPrefix,
-					AddHeaders:	copyStringMap(rCfg.Action.AddHeaders),
-					Timeout:	parseDurationOrZero(rCfg.Action.Timeout),
-					RetryCount:	rCfg.Action.RetryCount,
+					UpstreamPool: rCfg.Action.Upstream,
+					StripPrefix:  rCfg.Action.StripPrefix,
+					AddHeaders:   copyStringMap(rCfg.Action.AddHeaders),
+					Timeout:      parseDurationOrZero(rCfg.Action.Timeout),
+					RetryCount:   rCfg.Action.RetryCount,
 				},
 			})
 		}
@@ -672,13 +677,14 @@ func (a *AdminAPI) handleMeshRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		ServiceID	string			`json:"service_id"`
-		InstanceID	string			`json:"instance_id"`
-		Address		string			`json:"address"`
-		Port		int			`json:"port"`
-		Meta		map[string]string	`json:"meta,omitempty"`
+		ServiceID  string            `json:"service_id"`
+		InstanceID string            `json:"instance_id"`
+		Address    string            `json:"address"`
+		Port       int               `json:"port"`
+		Meta       map[string]string `json:"meta,omitempty"`
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
@@ -689,11 +695,11 @@ func (a *AdminAPI) handleMeshRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inst := &ServiceInstance{
-		ServiceID:	body.ServiceID,
-		InstanceID:	body.InstanceID,
-		Address:	body.Address,
-		Port:		body.Port,
-		Meta:		body.Meta,
+		ServiceID:  body.ServiceID,
+		InstanceID: body.InstanceID,
+		Address:    body.Address,
+		Port:       body.Port,
+		Meta:       body.Meta,
 	}
 
 	a.mesh.Register(inst)
@@ -711,6 +717,7 @@ func (a *AdminAPI) handleMeshHeartbeat(w http.ResponseWriter, r *http.Request) {
 		InstanceID string `json:"instance_id"`
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
@@ -738,6 +745,7 @@ func (a *AdminAPI) handleMeshDeregister(w http.ResponseWriter, r *http.Request) 
 		InstanceID string `json:"instance_id"`
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
@@ -763,33 +771,33 @@ func (a *AdminAPI) handleMeshServices(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type instanceResponse struct {
-		InstanceID	string			`json:"instance_id"`
-		Address		string			`json:"address"`
-		Port		int			`json:"port"`
-		Meta		map[string]string	`json:"meta,omitempty"`
-		LastHeartbeat	string			`json:"last_heartbeat"`
+		InstanceID    string            `json:"instance_id"`
+		Address       string            `json:"address"`
+		Port          int               `json:"port"`
+		Meta          map[string]string `json:"meta,omitempty"`
+		LastHeartbeat string            `json:"last_heartbeat"`
 	}
 	type serviceResponse struct {
-		ServiceID	string			`json:"service_id"`
-		Instances	[]instanceResponse	`json:"instances"`
+		ServiceID string             `json:"service_id"`
+		Instances []instanceResponse `json:"instances"`
 	}
 
 	serviceMap := make(map[string][]instanceResponse)
 	for _, inst := range a.mesh.Instances() {
 		serviceMap[inst.ServiceID] = append(serviceMap[inst.ServiceID], instanceResponse{
-			InstanceID:	inst.InstanceID,
-			Address:	inst.Address,
-			Port:		inst.Port,
-			Meta:		inst.Meta,
-			LastHeartbeat:	inst.LastHeartbeat.Format(time.RFC3339),
+			InstanceID:    inst.InstanceID,
+			Address:       inst.Address,
+			Port:          inst.Port,
+			Meta:          inst.Meta,
+			LastHeartbeat: inst.LastHeartbeat.Format(time.RFC3339),
 		})
 	}
 
 	var services []serviceResponse
 	for svcID, instances := range serviceMap {
 		services = append(services, serviceResponse{
-			ServiceID:	svcID,
-			Instances:	instances,
+			ServiceID: svcID,
+			Instances: instances,
 		})
 	}
 
@@ -805,26 +813,41 @@ func (a *AdminAPI) handleStats(w http.ResponseWriter, r *http.Request) {
 	gatewayStats := observability.GetStatsJSON()
 	sidecarStats := make(map[string]map[string]string)
 
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
 	client := &http.Client{Timeout: 2 * time.Second}
 
 	for _, inst := range a.mesh.Instances() {
-		if _, ok := sidecarStats[inst.ServiceID]; !ok {
-			sidecarStats[inst.ServiceID] = make(map[string]string)
-		}
+		wg.Add(1)
+		go func(instance *ServiceInstance) {
+			defer wg.Done()
 
-		url := fmt.Sprintf("http://%s:%d/stats", inst.Address, inst.Port)
-		resp, err := client.Get(url)
-		if err == nil {
-			body, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			sidecarStats[inst.ServiceID][inst.InstanceID] = string(body)
-		} else {
-			sidecarStats[inst.ServiceID][inst.InstanceID] = "error: " + err.Error()
-		}
+			url := fmt.Sprintf("http://%s:%d/stats", instance.Address, instance.Port)
+			resp, err := client.Get(url)
+
+			var result string
+			if err == nil {
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+				resp.Body.Close()
+				result = string(body)
+			} else {
+				result = "error: " + err.Error()
+			}
+
+			mu.Lock()
+			if _, ok := sidecarStats[instance.ServiceID]; !ok {
+				sidecarStats[instance.ServiceID] = make(map[string]string)
+			}
+			sidecarStats[instance.ServiceID][instance.InstanceID] = result
+			mu.Unlock()
+		}(inst)
 	}
 
+	wg.Wait()
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"gateway":	gatewayStats,
-		"sidecars":	sidecarStats,
+		"gateway":  gatewayStats,
+		"sidecars": sidecarStats,
 	})
 }

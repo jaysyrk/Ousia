@@ -3,55 +3,56 @@ package observability
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
-	RequestsTotal	= prometheus.NewCounterVec(
+	RequestsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name:	"ousia_requests_total",
-			Help:	"Total number of requests processed by the gateway.",
+			Name: "ousia_requests_total",
+			Help: "Total number of requests processed by the gateway.",
 		},
 		[]string{"method", "host", "upstream", "status"},
 	)
 
-	RequestDuration	= prometheus.NewHistogramVec(
+	RequestDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:		"ousia_request_duration_ms",
-			Help:		"Request duration in milliseconds.",
-			Buckets:	[]float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
+			Name:    "ousia_request_duration_ms",
+			Help:    "Request duration in milliseconds.",
+			Buckets: []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
 		},
 		[]string{"method", "host", "upstream"},
 	)
 
-	ActiveConnections	= prometheus.NewGauge(prometheus.GaugeOpts{
-		Name:	"ousia_active_connections",
-		Help:	"Number of active connections being handled.",
+	ActiveConnections = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ousia_active_connections",
+		Help: "Number of active connections being handled.",
 	})
 
-	HealthyEndpoints	= prometheus.NewGaugeVec(
+	HealthyEndpoints = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name:	"ousia_healthy_endpoints",
-			Help:	"Number of healthy endpoints per upstream pool.",
+			Name: "ousia_healthy_endpoints",
+			Help: "Number of healthy endpoints per upstream pool.",
 		},
 		[]string{"pool"},
 	)
 
-	MeshRequestsTotal	= prometheus.NewCounterVec(
+	MeshRequestsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name:	"ousia_mesh_requests_total",
-			Help:	"Total number of service-to-service requests in the mesh.",
+			Name: "ousia_mesh_requests_total",
+			Help: "Total number of service-to-service requests in the mesh.",
 		},
 		[]string{"source", "destination", "status", "method"},
 	)
 
-	MeshRequestDuration	= prometheus.NewHistogramVec(
+	MeshRequestDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:		"ousia_mesh_request_duration_ms",
-			Help:		"Service-to-service request duration in milliseconds.",
-			Buckets:	[]float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
+			Name:    "ousia_mesh_request_duration_ms",
+			Help:    "Service-to-service request duration in milliseconds.",
+			Buckets: []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
 		},
 		[]string{"source", "destination", "method"},
 	)
@@ -67,6 +68,8 @@ func InitMetrics() {
 }
 
 func StartAdminServer(addr string, register func(*http.ServeMux)) {
+	token := os.Getenv("OUSIA_ADMIN_TOKEN")
+
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -78,12 +81,47 @@ func StartAdminServer(addr string, register func(*http.ServeMux)) {
 		register(mux)
 	}
 
+	var handler http.Handler = mux
+	if token != "" {
+		handler = adminAuthMiddleware(token, mux)
+	} else {
+		fmt.Println("[WARNING] OUSIA_ADMIN_TOKEN is not set — admin API is unprotected!")
+	}
+
 	go func() {
 		fmt.Printf("Ousia admin server listening on %s\n", addr)
-		if err := http.ListenAndServe(addr, mux); err != nil {
+		if err := http.ListenAndServe(addr, handler); err != nil {
 			fmt.Printf("admin server error: %v\n", err)
 		}
 	}()
+}
+
+func adminAuthMiddleware(token string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		auth := r.Header.Get("Authorization")
+		if auth == "" {
+			http.Error(w, "authorization required", http.StatusUnauthorized)
+			return
+		}
+
+		const prefix = "Bearer "
+		if len(auth) < len(prefix) || auth[:len(prefix)] != prefix {
+			http.Error(w, "invalid authorization format", http.StatusUnauthorized)
+			return
+		}
+
+		if auth[len(prefix):] != token {
+			http.Error(w, "invalid token", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func GetStatsJSON() map[string]interface{} {

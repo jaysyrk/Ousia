@@ -22,9 +22,25 @@ type MeshRegistry struct {
 }
 
 func NewMeshRegistry(ttl time.Duration) *MeshRegistry {
-	return &MeshRegistry{
+	r := &MeshRegistry{
 		instances:	make(map[string]*ServiceInstance),
 		ttl:		ttl,
+	}
+	go r.cleanup()
+	return r
+}
+
+func (r *MeshRegistry) cleanup() {
+	ticker := time.NewTicker(r.ttl / 2)
+	for range ticker.C {
+		r.mu.Lock()
+		now := time.Now()
+		for id, inst := range r.instances {
+			if now.Sub(inst.LastHeartbeat) > r.ttl {
+				delete(r.instances, id)
+			}
+		}
+		r.mu.Unlock()
 	}
 }
 
@@ -71,18 +87,16 @@ func (r *MeshRegistry) Deregister(instanceID string) bool {
 }
 
 func (r *MeshRegistry) Instances() []*ServiceInstance {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	now := time.Now()
 	var live []*ServiceInstance
 
-	for id, inst := range r.instances {
-		if now.Sub(inst.LastHeartbeat) > r.ttl {
-			delete(r.instances, id)
-			continue
+	for _, inst := range r.instances {
+		if now.Sub(inst.LastHeartbeat) <= r.ttl {
+			live = append(live, inst)
 		}
-		live = append(live, inst)
 	}
 
 	return live

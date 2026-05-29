@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -91,6 +92,12 @@ func (rw *respHeaderWriter) Write(b []byte) (int, error) {
 }
 
 func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route *types.Route) {
+	if route.Action.Timeout > 0 {
+		ctx, cancel := context.WithTimeout(req.Context(), route.Action.Timeout)
+		defer cancel()
+		req = req.WithContext(ctx)
+	}
+
 	target := &url.URL{
 		Scheme: "http",
 		Host:   ep.Address,
@@ -121,8 +128,8 @@ func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route
 }
 
 func clientIP(req *http.Request) string {
-	if ip := req.Header.Get("X-Forwarded-For"); ip != "" {
-		return strings.Split(ip, ",")[0]
+	if i := strings.LastIndex(req.RemoteAddr, ":"); i != -1 {
+		return req.RemoteAddr[:i]
 	}
 	return req.RemoteAddr
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -47,6 +48,11 @@ func (p *InboundProxy) Start(listenAddr string) error {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/stats" {
+			token := os.Getenv("OUSIA_ADMIN_TOKEN")
+			if token != "" && req.Header.Get("Authorization") != "Bearer "+token {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
 			promhttp.Handler().ServeHTTP(w, req)
 			return
 		}
@@ -75,13 +81,23 @@ func (p *InboundProxy) Start(listenAddr string) error {
 	})
 
 	var finalHandler http.Handler = handler
-	wasmPath := "plugin.wasm"
-	wasmMiddleware, err := middleware.NewWasmMiddleware(context.Background(), wasmPath, handler)
-	if err == nil {
-		fmt.Println("sidecar inbound: WASM plugin loaded successfully!")
+	wasmPath := os.Getenv("OUSIA_WASM_PATH")
+	wasmHash := os.Getenv("OUSIA_WASM_SHA256")
+
+	if wasmPath != "" && wasmHash != "" {
+		if err := middleware.VerifyWasmHash(wasmPath, wasmHash); err != nil {
+			fmt.Printf("sidecar inbound: WASM integrity check failed: %v\n", err)
+			os.Exit(1)
+		}
+		wasmMiddleware, err := middleware.NewWasmMiddleware(context.Background(), wasmPath, handler)
+		if err != nil {
+			fmt.Printf("sidecar inbound: WASM plugin failed to load: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("sidecar inbound: WASM plugin loaded and verified")
 		finalHandler = wasmMiddleware
 	} else {
-		fmt.Printf("sidecar inbound: WASM plugin not loaded (%v), continuing without it...\n", err)
+		fmt.Println("sidecar inbound: no WASM plugin configured, skipping")
 	}
 
 	fmt.Printf("sidecar inbound: listening on %s → local :%d\n", listenAddr, p.localPort)

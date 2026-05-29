@@ -2,7 +2,7 @@ package controlplane
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -17,7 +17,7 @@ type Watcher struct {
 	path		string
 	store		*Store
 	interval	time.Duration
-	lastHash	[16]byte
+	lastHash	[32]byte
 	onChange	[]UpdateFunc
 }
 
@@ -74,19 +74,19 @@ func (w *Watcher) check() {
 	}
 }
 
-func hashFile(path string) ([16]byte, error) {
+func hashFile(path string) ([32]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return [16]byte{}, err
+		return [32]byte{}, err
 	}
 	defer f.Close()
 
-	h := md5.New()
+	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return [16]byte{}, err
+		return [32]byte{}, err
 	}
 
-	var out [16]byte
+	var out [32]byte
 	copy(out[:], h.Sum(nil))
 	return out, nil
 }

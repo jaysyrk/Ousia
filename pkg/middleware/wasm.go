@@ -2,6 +2,10 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -52,4 +56,24 @@ func (m *WasmMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if m.next != nil {
 		m.next.ServeHTTP(w, r)
 	}
+}
+
+func VerifyWasmHash(path, expectedHex string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+
+	actual := hex.EncodeToString(h.Sum(nil))
+	if actual != expectedHex {
+		return fmt.Errorf("wasm hash mismatch: expected %s got %s", expectedHex, actual)
+	}
+
+	return nil
 }

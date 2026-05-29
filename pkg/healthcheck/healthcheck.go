@@ -3,6 +3,7 @@ package healthcheck
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -104,6 +105,8 @@ func (c *Checker) probe(ep *types.Endpoint) error {
 		return err
 	}
 	defer resp.Body.Close()
+	
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode >= 500 {
 		return fmt.Errorf("unhealthy status %d", resp.StatusCode)
@@ -111,3 +114,4 @@ func (c *Checker) probe(ep *types.Endpoint) error {
 
 	return nil
 }
+

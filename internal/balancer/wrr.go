@@ -8,8 +8,9 @@ import (
 )
 
 type WRR struct {
-	mu	sync.RWMutex
-	entries	[]*types.Endpoint
+	mu      sync.RWMutex
+	entries []*types.Endpoint
+	counter atomic.Uint64
 }
 
 func NewWRR(endpoints []*types.Endpoint) *WRR {
@@ -36,7 +37,7 @@ func (w *WRR) Next(key string) (*types.Endpoint, error) {
 		}
 	}
 
-	idx := weightedCounter.Add(1) - 1
+	idx := w.counter.Add(1) - 1
 	return weighted[idx%uint64(len(weighted))], nil
 }
 
@@ -63,5 +64,3 @@ func (w *WRR) Endpoints() []*types.Endpoint {
 	defer w.mu.RUnlock()
 	return w.entries
 }
-
-var weightedCounter atomic.Uint64

@@ -5,11 +5,13 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/jaysyrk/ousia/pkg/types"
 )
 
 type Router struct {
+	mu    sync.RWMutex
 	hosts map[string]*types.VirtualHost
 }
 
@@ -29,10 +31,12 @@ func New(hosts []*types.VirtualHost) *Router {
 func (r *Router) Match(req *http.Request) (*types.Route, *types.VirtualHost, error) {
 	host := normalizeHost(req.Host)
 
+	r.mu.RLock()
 	vh, ok := r.hosts[host]
 	if !ok {
 		vh, ok = r.hosts["*"]
 	}
+	r.mu.RUnlock()
 	if !ok {
 		return nil, nil, fmt.Errorf("router: no virtual host for %q", host)
 	}
@@ -50,11 +54,15 @@ func (r *Router) AddVirtualHost(vh *types.VirtualHost) {
 	sort.Slice(vh.Routes, func(i, j int) bool {
 		return vh.Routes[i].Priority < vh.Routes[j].Priority
 	})
+	r.mu.Lock()
 	r.hosts[vh.Hostname] = vh
+	r.mu.Unlock()
 }
 
 func (r *Router) RemoveVirtualHost(hostname string) {
+	r.mu.Lock()
 	delete(r.hosts, hostname)
+	r.mu.Unlock()
 }
 
 func matchRoute(route *types.Route, req *http.Request) bool {

@@ -63,6 +63,10 @@ func (rl *rateLimiter) allow(key string) bool {
 
 	b, ok := rl.clients[key]
 	if !ok {
+		// cap map size to prevent memory exhaustion
+		if len(rl.clients) >= 10000 {
+			return false
+		}
 		rl.clients[key] = &bucket{tokens: rl.burst - 1, lastSeen: time.Now()}
 		return true
 	}
@@ -98,9 +102,6 @@ func (rl *rateLimiter) cleanup() {
 }
 
 func ExtractIP(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		return strings.Split(fwd, ",")[0]
-	}
 	if i := strings.LastIndex(r.RemoteAddr, ":"); i != -1 {
 		return r.RemoteAddr[:i]
 	}

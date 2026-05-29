@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -86,9 +87,10 @@ type EndpointConfig struct {
 }
 
 func Load(path string) (*OusiaConfig, error) {
-	data, err := os.ReadFile(path)
+	cleanPath := filepath.Clean(path)
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
-		return nil, fmt.Errorf("config: cannot read file %q: %w", path, err)
+		return nil, fmt.Errorf("config: cannot read file %q: %w", cleanPath, err)
 	}
 
 	var cfg OusiaConfig

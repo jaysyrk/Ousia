@@ -11,8 +11,8 @@ type CORSConfig struct {
 
 func DefaultCORSConfig() CORSConfig {
 	return CORSConfig{
-		AllowedOrigins:	[]string{"*"},
-		AllowedMethods:	[]string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowedOrigins:	[]string{},
+		AllowedMethods:	[]string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:	[]string{"Content-Type", "Authorization", "X-Request-Id", "X-Trace-Id"},
 		MaxAge:		"86400",
 	}
