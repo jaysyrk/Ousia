@@ -90,8 +90,8 @@ func TestChecker_Watch(t *testing.T) {
 	ep := &types.Endpoint{
 		ID:      "test-ep",
 		Address: addr,
-		Healthy: true,
 	}
+	ep.Healthy.Store(true)
 
 	checker := New([]*types.Endpoint{ep}, cfg)
 
@@ -105,7 +105,7 @@ func TestChecker_Watch(t *testing.T) {
 	mu.Unlock()
 
 	time.Sleep(50 * time.Millisecond)
-	if ep.Healthy {
+	if ep.Healthy.Load() {
 		t.Errorf("expected endpoint to be unhealthy")
 	}
 
@@ -114,7 +114,7 @@ func TestChecker_Watch(t *testing.T) {
 	mu.Unlock()
 
 	time.Sleep(50 * time.Millisecond)
-	if !ep.Healthy {
+	if !ep.Healthy.Load() {
 		t.Errorf("expected endpoint to recover and be healthy")
 	}
 }

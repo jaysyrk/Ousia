@@ -31,7 +31,7 @@ func (lc *LeastConn) Next(key string) (*types.Endpoint, error) {
 
 	var best *connEndpoint
 	for _, ce := range lc.entries {
-		if !ce.ep.Healthy {
+		if !ce.ep.Healthy.Load() {
 			continue
 		}
 		if best == nil || ce.active.Load() < best.active.Load() {

@@ -22,6 +22,7 @@ type AdminAPI struct {
 	balancers map[string]balancer.Balancer
 	store     *Store
 	mesh      *MeshRegistry
+	client    *http.Client
 }
 
 func NewAdminAPI(r *router.Router, balancers map[string]balancer.Balancer, store *Store, mesh *MeshRegistry) *AdminAPI {
@@ -30,6 +31,7 @@ func NewAdminAPI(r *router.Router, balancers map[string]balancer.Balancer, store
 		balancers: balancers,
 		store:     store,
 		mesh:      mesh,
+		client:    &http.Client{Timeout: 2 * time.Second},
 	}
 }
 
@@ -312,7 +314,7 @@ func (a *AdminAPI) listUpstreams(w http.ResponseWriter, r *http.Request) {
 					ID:      ep.ID,
 					Address: ep.Address,
 					Weight:  ep.Weight,
-					Healthy: ep.Healthy,
+					Healthy: ep.Healthy.Load(),
 				})
 			}
 		}
@@ -353,8 +355,8 @@ func (a *AdminAPI) addEndpoint(w http.ResponseWriter, r *http.Request, poolName 
 		ID:      body.ID,
 		Address: body.Address,
 		Weight:  defaultWeight(body.Weight),
-		Healthy: true,
 	}
+	endpoint.Healthy.Store(true)
 
 	cfg := cloneConfig(a.store.Get())
 	if err := updateUpstreamEndpointsInConfig(cfg, poolName, endpoint, true); err != nil {
@@ -621,11 +623,14 @@ func applyRouteToRouter(r *router.Router, cfg *config.OusiaConfig, route *types.
 					Headers:    copyStringMap(rCfg.Match.Headers),
 				},
 				Action: types.RouteAction{
-					UpstreamPool: rCfg.Action.Upstream,
-					StripPrefix:  rCfg.Action.StripPrefix,
-					AddHeaders:   copyStringMap(rCfg.Action.AddHeaders),
-					Timeout:      parseDurationOrZero(rCfg.Action.Timeout),
-					RetryCount:   rCfg.Action.RetryCount,
+					UpstreamPool:      rCfg.Action.Upstream,
+					StripPrefix:       rCfg.Action.StripPrefix,
+					AddHeaders:        copyStringMap(rCfg.Action.AddHeaders),
+					RemoveHeaders:     append([]string(nil), rCfg.Action.RemoveHeaders...),
+					AddRespHeaders:    copyStringMap(rCfg.Action.AddRespHeaders),
+					RemoveRespHeaders: append([]string(nil), rCfg.Action.RemoveRespHeaders...),
+					Timeout:           parseDurationOrZero(rCfg.Action.Timeout),
+					RetryCount:        rCfg.Action.RetryCount,
 				},
 			})
 		}
@@ -650,11 +655,14 @@ func rebuildRouterForConfig(r *router.Router, cfg *config.OusiaConfig) {
 					Headers:    copyStringMap(rCfg.Match.Headers),
 				},
 				Action: types.RouteAction{
-					UpstreamPool: rCfg.Action.Upstream,
-					StripPrefix:  rCfg.Action.StripPrefix,
-					AddHeaders:   copyStringMap(rCfg.Action.AddHeaders),
-					Timeout:      parseDurationOrZero(rCfg.Action.Timeout),
-					RetryCount:   rCfg.Action.RetryCount,
+					UpstreamPool:      rCfg.Action.Upstream,
+					StripPrefix:       rCfg.Action.StripPrefix,
+					AddHeaders:        copyStringMap(rCfg.Action.AddHeaders),
+					RemoveHeaders:     append([]string(nil), rCfg.Action.RemoveHeaders...),
+					AddRespHeaders:    copyStringMap(rCfg.Action.AddRespHeaders),
+					RemoveRespHeaders: append([]string(nil), rCfg.Action.RemoveRespHeaders...),
+					Timeout:           parseDurationOrZero(rCfg.Action.Timeout),
+					RetryCount:        rCfg.Action.RetryCount,
 				},
 			})
 		}
@@ -811,12 +819,10 @@ func (a *AdminAPI) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gatewayStats := observability.GetStatsJSON()
-	sidecarStats := make(map[string]map[string]string)
+	sidecarStats := make(map[string]map[string]any)
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-
-	client := &http.Client{Timeout: 2 * time.Second}
 
 	for _, inst := range a.mesh.Instances() {
 		wg.Add(1)
@@ -824,20 +830,25 @@ func (a *AdminAPI) handleStats(w http.ResponseWriter, r *http.Request) {
 			defer wg.Done()
 
 			url := fmt.Sprintf("http://%s:%d/stats", instance.Address, instance.Port)
-			resp, err := client.Get(url)
+			resp, err := a.client.Get(url)
 
-			var result string
+			var result any
 			if err == nil {
 				body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 				resp.Body.Close()
-				result = string(body)
+				var parsed map[string]any
+				if json.Unmarshal(body, &parsed) == nil {
+					result = parsed
+				} else {
+					result = string(body)
+				}
 			} else {
 				result = "error: " + err.Error()
 			}
 
 			mu.Lock()
 			if _, ok := sidecarStats[instance.ServiceID]; !ok {
-				sidecarStats[instance.ServiceID] = make(map[string]string)
+				sidecarStats[instance.ServiceID] = make(map[string]any)
 			}
 			sidecarStats[instance.ServiceID][instance.InstanceID] = result
 			mu.Unlock()

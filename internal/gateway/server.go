@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -18,10 +19,12 @@ type Server struct {
 	httpServer *http.Server
 	tlsServer  *http.Server
 	tlsAddr    string
+	cancel     context.CancelFunc
 }
 
 func NewServer(cfg *config.OusiaConfig, r *router.Router, balancers map[string]balancer.Balancer, handler http.Handler, tlsCfg *tls.Config) *Server {
-	vhostLimiters := buildVhostLimiters(cfg)
+	ctx, cancel := context.WithCancel(context.Background())
+	vhostLimiters := buildVhostLimiters(ctx, cfg)
 	rateLimited := applyVhostRateLimiting(handler, vhostLimiters)
 
 	chain := middleware.Chain(
@@ -45,6 +48,7 @@ func NewServer(cfg *config.OusiaConfig, r *router.Router, balancers map[string]b
 			WriteTimeout: 60 * time.Second,
 			IdleTimeout:  120 * time.Second,
 		},
+		cancel: cancel,
 	}
 
 	if tlsCfg != nil && cfg.Gateway.TLSAddr != "" {
@@ -54,7 +58,7 @@ func NewServer(cfg *config.OusiaConfig, r *router.Router, balancers map[string]b
 	return s
 }
 
-func buildVhostLimiters(cfg *config.OusiaConfig) map[string]middleware.Middleware {
+func buildVhostLimiters(ctx context.Context, cfg *config.OusiaConfig) map[string]middleware.Middleware {
 	limiters := make(map[string]middleware.Middleware)
 	for _, vh := range cfg.VirtualHosts {
 		if vh.RateLimit == nil {
@@ -73,7 +77,7 @@ func buildVhostLimiters(cfg *config.OusiaConfig) map[string]middleware.Middlewar
 			keyFn = middleware.HeaderKeyFunc(headerName)
 		}
 
-		limiters[vh.Hostname] = middleware.RateLimitWithKey(rps, burst, keyFn)
+		limiters[vh.Hostname] = middleware.RateLimitWithKey(ctx, rps, burst, keyFn)
 	}
 	return limiters
 }
@@ -106,8 +110,14 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	if s.tlsServer != nil {
-		s.tlsServer.Shutdown(ctx)
+	if s.cancel != nil {
+		s.cancel()
 	}
-	return s.httpServer.Shutdown(ctx)
+	var tlsErr error
+	if s.tlsServer != nil {
+		tlsErr = s.tlsServer.Shutdown(ctx)
+	}
+	httpErr := s.httpServer.Shutdown(ctx)
+	return errors.Join(tlsErr, httpErr)
 }
+

@@ -36,7 +36,8 @@ func TestNew(t *testing.T) {
 
 func TestRoundRobin_Lifecycle(t *testing.T) {
 	rr := NewRoundRobin(nil)
-	ep := &types.Endpoint{ID: "e1", Healthy: true}
+	ep := &types.Endpoint{ID: "e1"}
+	ep.Healthy.Store(true)
 	rr.Add(ep)
 	if len(rr.Endpoints()) != 1 {
 		t.Errorf("expected 1 endpoint")
@@ -50,7 +51,8 @@ func TestRoundRobin_Lifecycle(t *testing.T) {
 
 func TestWRR_Lifecycle(t *testing.T) {
 	wrr := NewWRR(nil)
-	ep := &types.Endpoint{ID: "e1", Healthy: true, Weight: 0}
+	ep := &types.Endpoint{ID: "e1", Weight: 0}
+	ep.Healthy.Store(true)
 	wrr.Add(ep)
 	if len(wrr.Endpoints()) != 1 {
 		t.Errorf("expected 1 endpoint")
@@ -72,7 +74,8 @@ func TestWRR_Lifecycle(t *testing.T) {
 
 func TestLeastConn_Lifecycle(t *testing.T) {
 	lc := NewLeastConn(nil)
-	ep := &types.Endpoint{ID: "e1", Healthy: true}
+	ep := &types.Endpoint{ID: "e1"}
+	ep.Healthy.Store(true)
 	lc.Add(ep)
 	if len(lc.Endpoints()) != 1 {
 		t.Errorf("expected 1 endpoint")
@@ -87,7 +90,8 @@ func TestLeastConn_Lifecycle(t *testing.T) {
 		t.Errorf("expected 0 endpoints")
 	}
 
-	ep2 := &types.Endpoint{ID: "e2", Healthy: false}
+	ep2 := &types.Endpoint{ID: "e2"}
+	ep2.Healthy.Store(false)
 	lc.Add(ep2)
 	_, err = lc.Next("")
 	if err != ErrNoHealthyEndpoints {

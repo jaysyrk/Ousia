@@ -1,12 +1,15 @@
 package types
 
-import "time"
+import (
+	"sync/atomic"
+	"time"
+)
 
 type Endpoint struct {
 	ID		string
 	Address		string
 	Weight		int
-	Healthy		bool
+	Healthy		atomic.Bool
 	Metadata	map[string]string
 }
 

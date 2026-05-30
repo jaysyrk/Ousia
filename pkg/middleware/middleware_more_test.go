@@ -12,7 +12,7 @@ import (
 )
 
 func TestRateLimit(t *testing.T) {
-	rl := RateLimit(1, 1)
+	rl := RateLimit(context.Background(), 1, 1)
 	handler := rl(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))

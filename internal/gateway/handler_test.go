@@ -42,7 +42,8 @@ func TestGateway_BalancerDoneCalled(t *testing.T) {
 
 	addr := backend.URL[7:]
 	
-	ep := &types.Endpoint{ID: "test-ep", Address: addr, Healthy: true}
+	ep := &types.Endpoint{ID: "test-ep", Address: addr}
+	ep.Healthy.Store(true)
 	mb := &mockBalancer{ep: ep}
 
 	vh := &types.VirtualHost{
@@ -92,7 +93,8 @@ func TestGateway_ResiliencyRetry(t *testing.T) {
 	defer backend.Close()
 
 	addr := backend.URL[7:]
-	ep := &types.Endpoint{ID: "retry-ep", Address: addr, Healthy: true}
+	ep := &types.Endpoint{ID: "retry-ep", Address: addr}
+	ep.Healthy.Store(true)
 	mb := &mockBalancer{ep: ep}
 
 	vh := &types.VirtualHost{
@@ -134,7 +136,8 @@ func TestGateway_CircuitBreaker(t *testing.T) {
 	defer backend.Close()
 
 	addr := backend.URL[7:]
-	ep := &types.Endpoint{ID: "cb-ep", Address: addr, Healthy: true}
+	ep := &types.Endpoint{ID: "cb-ep", Address: addr}
+	ep.Healthy.Store(true)
 	mb := &mockBalancer{ep: ep}
 
 	vh := &types.VirtualHost{

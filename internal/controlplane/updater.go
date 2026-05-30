@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/jaysyrk/ousia/internal/balancer"
 	"github.com/jaysyrk/ousia/internal/router"
@@ -30,6 +31,7 @@ func applyVirtualHosts(r *router.Router, cfg *config.OusiaConfig) {
 		}
 
 		for _, rCfg := range vhCfg.Routes {
+			timeout, _ := time.ParseDuration(rCfg.Action.Timeout)
 			route := &types.Route{
 				ID:       rCfg.ID,
 				Priority: rCfg.Priority,
@@ -46,6 +48,7 @@ func applyVirtualHosts(r *router.Router, cfg *config.OusiaConfig) {
 					RemoveHeaders:     rCfg.Action.RemoveHeaders,
 					AddRespHeaders:    rCfg.Action.AddRespHeaders,
 					RemoveRespHeaders: rCfg.Action.RemoveRespHeaders,
+					Timeout:           timeout,
 					RetryCount:        rCfg.Action.RetryCount,
 				},
 			}
@@ -66,13 +69,14 @@ func applyUpstreams(balancers map[string]balancer.Balancer, cfg *config.OusiaCon
 			if w == 0 {
 				w = 1
 			}
-			endpoints = append(endpoints, &types.Endpoint{
-				ID:		epCfg.ID,
-				Address:	epCfg.Address,
-				Weight:		w,
-				Healthy:	true,
-				Metadata:	epCfg.Meta,
-			})
+			ep := &types.Endpoint{
+				ID:       epCfg.ID,
+				Address:  epCfg.Address,
+				Weight:   w,
+				Metadata: epCfg.Meta,
+			}
+			ep.Healthy.Store(true)
+			endpoints = append(endpoints, ep)
 		}
 
 		pool := &types.UpstreamPool{

@@ -7,11 +7,13 @@ import (
 )
 
 func healthyEndpoints() []*types.Endpoint {
-	return []*types.Endpoint{
-		{ID: "ep-1", Address: "10.0.0.1:8080", Weight: 1, Healthy: true},
-		{ID: "ep-2", Address: "10.0.0.2:8080", Weight: 1, Healthy: true},
-		{ID: "ep-3", Address: "10.0.0.3:8080", Weight: 1, Healthy: true},
-	}
+	ep1 := &types.Endpoint{ID: "ep-1", Address: "10.0.0.1:8080", Weight: 1}
+	ep1.Healthy.Store(true)
+	ep2 := &types.Endpoint{ID: "ep-2", Address: "10.0.0.2:8080", Weight: 1}
+	ep2.Healthy.Store(true)
+	ep3 := &types.Endpoint{ID: "ep-3", Address: "10.0.0.3:8080", Weight: 1}
+	ep3.Healthy.Store(true)
+	return []*types.Endpoint{ep1, ep2, ep3}
 }
 
 func TestRoundRobin_Distributes(t *testing.T) {
@@ -35,7 +37,7 @@ func TestRoundRobin_Distributes(t *testing.T) {
 
 func TestRoundRobin_SkipsUnhealthy(t *testing.T) {
 	endpoints := healthyEndpoints()
-	endpoints[1].Healthy = false
+	endpoints[1].Healthy.Store(false)
 	rr := NewRoundRobin(endpoints)
 
 	for i := 0; i < 6; i++ {
@@ -52,7 +54,7 @@ func TestRoundRobin_SkipsUnhealthy(t *testing.T) {
 func TestRoundRobin_NoHealthy(t *testing.T) {
 	endpoints := healthyEndpoints()
 	for _, ep := range endpoints {
-		ep.Healthy = false
+		ep.Healthy.Store(false)
 	}
 	rr := NewRoundRobin(endpoints)
 	_, err := rr.Next("")
@@ -62,10 +64,11 @@ func TestRoundRobin_NoHealthy(t *testing.T) {
 }
 
 func TestWRR_RespectsWeights(t *testing.T) {
-	endpoints := []*types.Endpoint{
-		{ID: "ep-1", Address: "10.0.0.1:8080", Weight: 3, Healthy: true},
-		{ID: "ep-2", Address: "10.0.0.2:8080", Weight: 1, Healthy: true},
-	}
+	ep1 := &types.Endpoint{ID: "ep-1", Address: "10.0.0.1:8080", Weight: 3}
+	ep1.Healthy.Store(true)
+	ep2 := &types.Endpoint{ID: "ep-2", Address: "10.0.0.2:8080", Weight: 1}
+	ep2.Healthy.Store(true)
+	endpoints := []*types.Endpoint{ep1, ep2}
 	wrr := NewWRR(endpoints)
 	counts := map[string]int{}
 

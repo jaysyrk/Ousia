@@ -3,6 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -24,8 +25,15 @@ func buildTLSConfig(tlsCfg *types.TLSConfig) (*tls.Config, error) {
 func redirectToHTTPS(tlsAddr string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
 		if host == "" {
-			host = "localhost" + tlsAddr
+			host = "localhost"
+		}
+		_, port, _ := net.SplitHostPort(tlsAddr)
+		if port != "" && port != "443" {
+			host = net.JoinHostPort(host, port)
 		}
 		target := "https://" + host + r.URL.RequestURI()
 		http.Redirect(w, r, target, http.StatusTemporaryRedirect)

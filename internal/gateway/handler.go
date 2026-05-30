@@ -3,6 +3,8 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -154,6 +156,8 @@ func (t *resiliencyTransport) RoundTrip(req *http.Request) (*http.Response, erro
 		}
 
 		if resp.StatusCode >= 500 {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
 			if t.cb != nil {
 				t.cb.Failure()
 			}
@@ -214,8 +218,9 @@ func forward(w http.ResponseWriter, req *http.Request, ep *types.Endpoint, route
 }
 
 func clientIP(req *http.Request) string {
-	if i := strings.LastIndex(req.RemoteAddr, ":"); i != -1 {
-		return req.RemoteAddr[:i]
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return req.RemoteAddr
 	}
-	return req.RemoteAddr
+	return host
 }

@@ -18,7 +18,7 @@ type Balancer interface {
 func healthy(endpoints []*types.Endpoint) []*types.Endpoint {
 	out := make([]*types.Endpoint, 0, len(endpoints))
 	for _, ep := range endpoints {
-		if ep.Healthy {
+		if ep.Healthy.Load() {
 			out = append(out, ep)
 		}
 	}

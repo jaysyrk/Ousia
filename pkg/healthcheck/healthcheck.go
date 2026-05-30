@@ -75,8 +75,8 @@ func (c *Checker) watch(ctx context.Context, ep *types.Endpoint) {
 				successes = 0
 				failures++
 				if failures >= c.cfg.FailThreshold {
-					if ep.Healthy {
-						ep.Healthy = false
+					if ep.Healthy.Load() {
+						ep.Healthy.Store(false)
 						failures = 0
 						fmt.Printf("healthcheck: endpoint %s (%s) marked unhealthy: %v\n", ep.ID, ep.Address, err)
 					}
@@ -84,9 +84,9 @@ func (c *Checker) watch(ctx context.Context, ep *types.Endpoint) {
 			} else {
 				failures = 0
 				successes++
-				if !ep.Healthy {
+				if !ep.Healthy.Load() {
 					if successes >= c.cfg.SuccessThreshold {
-						ep.Healthy = true
+						ep.Healthy.Store(true)
 						successes = 0
 						fmt.Printf("healthcheck: endpoint %s (%s) recovered\n", ep.ID, ep.Address)
 					}

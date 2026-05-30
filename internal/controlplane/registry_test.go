@@ -1,12 +1,17 @@
 package controlplane
 
 import (
+	"context"
 	"testing"
 	"time"
 )
 
 func TestMeshRegistry(t *testing.T) {
 	reg := NewMeshRegistry(50 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reg.StartCleanup(ctx)
+
 	inst := &ServiceInstance{
 		ServiceID:  "svc-1",
 		InstanceID: "inst-1",

@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,6 +25,9 @@ func TestAdminAPI(t *testing.T) {
 		},
 	})
 	mesh := NewMeshRegistry(time.Minute)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mesh.StartCleanup(ctx)
 
 	updater := BuildUpdateFunc(r, balancers)
 	updater(store.Get())

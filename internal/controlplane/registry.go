@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -26,21 +27,30 @@ func NewMeshRegistry(ttl time.Duration) *MeshRegistry {
 		instances:	make(map[string]*ServiceInstance),
 		ttl:		ttl,
 	}
-	go r.cleanup()
 	return r
 }
 
-func (r *MeshRegistry) cleanup() {
+func (r *MeshRegistry) StartCleanup(ctx context.Context) {
+	go r.cleanup(ctx)
+}
+
+func (r *MeshRegistry) cleanup(ctx context.Context) {
 	ticker := time.NewTicker(r.ttl / 2)
-	for range ticker.C {
-		r.mu.Lock()
-		now := time.Now()
-		for id, inst := range r.instances {
-			if now.Sub(inst.LastHeartbeat) > r.ttl {
-				delete(r.instances, id)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			r.mu.Lock()
+			now := time.Now()
+			for id, inst := range r.instances {
+				if now.Sub(inst.LastHeartbeat) > r.ttl {
+					delete(r.instances, id)
+				}
 			}
+			r.mu.Unlock()
 		}
-		r.mu.Unlock()
 	}
 }
 

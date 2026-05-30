@@ -1,8 +1,9 @@
 package middleware
 
 import (
+	"context"
+	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -21,11 +22,11 @@ type bucket struct {
 	lastSeen time.Time
 }
 
-func RateLimit(requestsPerSecond int, burst int) Middleware {
-	return RateLimitWithKey(requestsPerSecond, burst, ExtractIP)
+func RateLimit(ctx context.Context, requestsPerSecond int, burst int) Middleware {
+	return RateLimitWithKey(ctx, requestsPerSecond, burst, ExtractIP)
 }
 
-func RateLimitWithKey(requestsPerSecond int, burst int, keyFn func(*http.Request) string) Middleware {
+func RateLimitWithKey(ctx context.Context, requestsPerSecond int, burst int, keyFn func(*http.Request) string) Middleware {
 	rl := &rateLimiter{
 		clients:  make(map[string]*bucket),
 		rate:     requestsPerSecond,
@@ -34,7 +35,7 @@ func RateLimitWithKey(requestsPerSecond int, burst int, keyFn func(*http.Request
 		keyFn:    keyFn,
 	}
 
-	go rl.cleanup()
+	go rl.cleanup(ctx)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +64,6 @@ func (rl *rateLimiter) allow(key string) bool {
 
 	b, ok := rl.clients[key]
 	if !ok {
-		// cap map size to prevent memory exhaustion
 		if len(rl.clients) >= 10000 {
 			return false
 		}
@@ -87,23 +87,30 @@ func (rl *rateLimiter) allow(key string) bool {
 	return true
 }
 
-func (rl *rateLimiter) cleanup() {
+func (rl *rateLimiter) cleanup(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		rl.mu.Lock()
-		for key, b := range rl.clients {
-			if time.Since(b.lastSeen) > 10*time.Minute {
-				delete(rl.clients, key)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			rl.mu.Lock()
+			for key, b := range rl.clients {
+				if time.Since(b.lastSeen) > 10*time.Minute {
+					delete(rl.clients, key)
+				}
 			}
+			rl.mu.Unlock()
 		}
-		rl.mu.Unlock()
 	}
 }
 
 func ExtractIP(r *http.Request) string {
-	if i := strings.LastIndex(r.RemoteAddr, ":"); i != -1 {
-		return r.RemoteAddr[:i]
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
 	}
-	return r.RemoteAddr
+	return host
 }
+

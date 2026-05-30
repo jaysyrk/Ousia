@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,9 +23,9 @@ gateway:
 	store := NewStore(&config.OusiaConfig{})
 	w := NewWatcher(path, store, 10*time.Millisecond)
 
-	called := false
+	var called atomic.Bool
 	w.OnChange(func(cfg *config.OusiaConfig) {
-		called = true
+		called.Store(true)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -32,13 +33,14 @@ gateway:
 
 	go w.Start(ctx)
 
-	// Trigger initial check
 	time.Sleep(50 * time.Millisecond)
-	if !called {
+	if !called.Load() {
 		t.Error("expected onChange to be called")
 	}
-	
-	// Test error reading file
-	w.path = filepath.Join(dir, "doesnotexist")
-	w.check()
+	cancel()
+
+	// Test error reading file with a new watcher to avoid data race
+	w2 := NewWatcher(filepath.Join(dir, "doesnotexist"), store, 10*time.Millisecond)
+	w2.check()
 }
+

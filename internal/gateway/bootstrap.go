@@ -62,6 +62,7 @@ func Bootstrap(cfg *config.OusiaConfig, configPath string) (*Server, error) {
 	watcher.OnChange(controlplane.BuildUpdateFunc(r, balancers))
 
 	mesh := controlplane.NewMeshRegistry(30 * time.Second)
+	mesh.StartCleanup(context.Background())
 	admin := controlplane.NewAdminAPI(r, balancers, store, mesh)
 	observability.StartAdminServer(cfg.Gateway.AdminAddr, admin.RegisterRoutes)
 
@@ -120,13 +121,14 @@ func buildVirtualHosts(cfg *config.OusiaConfig) ([]*types.VirtualHost, error) {
 					Headers:    rCfg.Match.Headers,
 				},
 				Action: types.RouteAction{
-					UpstreamPool:  rCfg.Action.Upstream,
-					StripPrefix:   rCfg.Action.StripPrefix,
-					AddHeaders:    rCfg.Action.AddHeaders,
-					RemoveHeaders: rCfg.Action.RemoveHeaders,
+					UpstreamPool:      rCfg.Action.Upstream,
+					StripPrefix:       rCfg.Action.StripPrefix,
+					AddHeaders:        rCfg.Action.AddHeaders,
+					RemoveHeaders:     rCfg.Action.RemoveHeaders,
 					AddRespHeaders:    rCfg.Action.AddRespHeaders,
 					RemoveRespHeaders: rCfg.Action.RemoveRespHeaders,
-					RetryCount:   rCfg.Action.RetryCount,
+					Timeout:           parseDurationSafe(rCfg.Action.Timeout),
+					RetryCount:        rCfg.Action.RetryCount,
 				},
 			}
 			vh.Routes = append(vh.Routes, route)
@@ -154,9 +156,9 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, map[
 				ID:       epCfg.ID,
 				Address:  epCfg.Address,
 				Weight:   w,
-				Healthy:  true,
 				Metadata: epCfg.Meta,
 			}
+			ep.Healthy.Store(true)
 			endpoints = append(endpoints, ep)
 		}
 
@@ -177,4 +179,12 @@ func buildBalancers(cfg *config.OusiaConfig) (map[string]balancer.Balancer, map[
 	}
 
 	return balancers, endpointsByPool, nil
+}
+
+func parseDurationSafe(s string) time.Duration {
+	if s == "" {
+		return 0
+	}
+	d, _ := time.ParseDuration(s)
+	return d
 }

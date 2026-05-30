@@ -7,25 +7,26 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func TestSidecarRegistrar(t *testing.T) {
-	var registerHits int
-	var hbHits int
-	var deregisterHits int
+	var registerHits atomic.Int32
+	var hbHits atomic.Int32
+	var deregisterHits atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/mesh/register":
-			registerHits++
+			registerHits.Add(1)
 			w.WriteHeader(http.StatusCreated)
 		case "/api/mesh/heartbeat":
-			hbHits++
+			hbHits.Add(1)
 			w.WriteHeader(http.StatusOK)
 		case "/api/mesh/deregister":
-			deregisterHits++
+			deregisterHits.Add(1)
 			w.WriteHeader(http.StatusOK)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -39,18 +40,18 @@ func TestSidecarRegistrar(t *testing.T) {
 
 	go r.Start(ctx)
 
-	time.Sleep(120 * time.Millisecond) // should get register and at least 1-2 heartbeats
+	time.Sleep(120 * time.Millisecond)
 	cancel()
-	time.Sleep(50 * time.Millisecond) // wait for deregister to happen
+	time.Sleep(50 * time.Millisecond)
 
-	if registerHits != 1 {
-		t.Errorf("expected 1 register hit, got %d", registerHits)
+	if registerHits.Load() != 1 {
+		t.Errorf("expected 1 register hit, got %d", registerHits.Load())
 	}
-	if hbHits < 1 {
-		t.Errorf("expected at least 1 heartbeat hit, got %d", hbHits)
+	if hbHits.Load() < 1 {
+		t.Errorf("expected at least 1 heartbeat hit, got %d", hbHits.Load())
 	}
-	if deregisterHits != 1 {
-		t.Errorf("expected 1 deregister hit, got %d", deregisterHits)
+	if deregisterHits.Load() != 1 {
+		t.Errorf("expected 1 deregister hit, got %d", deregisterHits.Load())
 	}
 }
 
