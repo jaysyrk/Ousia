@@ -1,5 +1,9 @@
 # Ousia
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/jaysyrk/Ousia.svg)](https://pkg.go.dev/github.com/jaysyrk/Ousia)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jaysyrk/Ousia)](https://goreportcard.com/report/github.com/jaysyrk/Ousia)
+[![Coverage Status](https://coveralls.io/repos/github/jaysyrk/Ousia/badge.svg?branch=main)](https://coveralls.io/github/jaysyrk/Ousia?branch=main)
+
 A High-Performance, Dynamic L7 Edge Gateway and Service Mesh in Go.
 
 ## What is Ousia?

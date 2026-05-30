@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -58,13 +59,17 @@ var (
 	)
 )
 
+var initOnce sync.Once
+
 func InitMetrics() {
-	prometheus.MustRegister(RequestsTotal)
-	prometheus.MustRegister(RequestDuration)
-	prometheus.MustRegister(ActiveConnections)
-	prometheus.MustRegister(HealthyEndpoints)
-	prometheus.MustRegister(MeshRequestsTotal)
-	prometheus.MustRegister(MeshRequestDuration)
+	initOnce.Do(func() {
+		prometheus.MustRegister(RequestsTotal)
+		prometheus.MustRegister(RequestDuration)
+		prometheus.MustRegister(ActiveConnections)
+		prometheus.MustRegister(HealthyEndpoints)
+		prometheus.MustRegister(MeshRequestsTotal)
+		prometheus.MustRegister(MeshRequestDuration)
+	})
 }
 
 func StartAdminServer(addr string, register func(*http.ServeMux)) {
