@@ -88,7 +88,7 @@ go test ./... -v
 
 ### 4. Load Testing with TitanBot
 
-Ousia has been rigorously "strength tested" using [TitanBot](https://github.com/jaysyrk/TitanBot), a high-performance multi-vector load testing engine.
+Ousia has been rigorously strength tested using [TitanBot](https://github.com/jaysyrk/TitanBot), a high-performance multi-vector load testing engine.
 
 During an **Omni Mode** test (bombarding the gateway with HTTP, WebSockets, TCP, and UDP simultaneously using 2,000 concurrent connections), Ousia successfully processed over **8.7 million requests** in 30 seconds with a **99.45% success rate** and an average latency of just **2ms**! 
 
