@@ -37,6 +37,7 @@ services:
       -inbound-port 15000
       -outbound-port 15001
     environment:
+      - OUSIA_ADMIN_TOKEN=pmUEyk2ilbWHO7FAsVSIBtLhnC9T8aR5Go06Nu1f
       - OUSIA_WASM_PATH=/app/plugin.wasm
       - OUSIA_WASM_SHA256=4e1301a203aeebc00c599d24fd5d09e8328311481f10c40fc827b5a40b37c0df
 
@@ -61,6 +62,7 @@ services:
       -inbound-port 15000
       -outbound-port 15001
     environment:
+      - OUSIA_ADMIN_TOKEN=pmUEyk2ilbWHO7FAsVSIBtLhnC9T8aR5Go06Nu1f
       - OUSIA_WASM_PATH=/app/plugin.wasm
       - OUSIA_WASM_SHA256=4e1301a203aeebc00c599d24fd5d09e8328311481f10c40fc827b5a40b37c0df
 

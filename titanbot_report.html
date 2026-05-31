@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TitanBot Load Test Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 {
+            font-size: 3rem;
+            margin: 0;
+            background: linear-gradient(90deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .card h3 {
+            margin: 0 0 10px 0;
+            color: var(--text-muted);
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .card .value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin: 0;
+        }
+        .value.success { color: var(--success); }
+        .value.danger { color: var(--danger); }
+        .value.accent { color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>TitanBot Report</h1>
+            <p class="subtitle">Strength Test Results</p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Total Requests</h3>
+                <p class="value accent">8730312</p>
+            </div>
+            <div class="card">
+                <h3>Duration</h3>
+                <p class="value">30.5307093s</p>
+            </div>
+            <div class="card">
+                <h3>Requests / Sec</h3>
+                <p class="value accent">285951.82</p>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Success Rate</h3>
+                <p class="value success">99.45%</p>
+                <p style="color: var(--text-muted); margin-top: 10px;">8682959 successful</p>
+            </div>
+            <div class="card">
+                <h3>Failure Rate</h3>
+                <p class="value danger">0.54%</p>
+                <p style="color: var(--text-muted); margin-top: 10px;">47353 failed</p>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Min Latency</h3>
+                <p class="value">0ms</p>
+            </div>
+            <div class="card">
+                <h3>Max Latency</h3>
+                <p class="value">4598ms</p>
+            </div>
+            <div class="card">
+                <h3>Avg Latency</h3>
+                <p class="value">2ms</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
