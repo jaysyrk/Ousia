@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -98,15 +99,30 @@ func applyVhostRateLimiting(next http.Handler, limiters map[string]middleware.Mi
 
 func (s *Server) Start() error {
 	fmt.Printf("Ousia Gateway listening on %s\n", s.httpServer.Addr)
+
+	ln, err := net.Listen("tcp", s.httpServer.Addr)
+	if err != nil {
+		return err
+	}
+
+	bouncerLn := NewBouncerListener(ln, 50, 100)
+
 	if s.tlsServer != nil {
 		go func() {
 			fmt.Printf("Ousia Gateway TLS listening on %s\n", s.tlsAddr)
-			if err := s.tlsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+			tlsLn, err := net.Listen("tcp", s.tlsAddr)
+			if err != nil {
+				fmt.Printf("TLS listen error: %v\n", err)
+				return
+			}
+			tlsBouncer := NewBouncerListener(tlsLn, 50, 100)
+
+			if err := s.tlsServer.ServeTLS(tlsBouncer, "", ""); err != nil && err != http.ErrServerClosed {
 				fmt.Printf("TLS server error: %v\n", err)
 			}
 		}()
 	}
-	return s.httpServer.ListenAndServe()
+	return s.httpServer.Serve(bouncerLn)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
@@ -120,4 +136,3 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	httpErr := s.httpServer.Shutdown(ctx)
 	return errors.Join(tlsErr, httpErr)
 }
-
